@@ -1,9 +1,12 @@
 """The programmatic runner preserves turns and isolates each scenario."""
 
+import asyncio
 from datetime import date
 from types import SimpleNamespace
 
 import pytest
+from agents import OpenAIChatCompletionsModel
+from openai import AsyncOpenAI
 
 from src.agents.centralized.evaluation import run_centralized_session_async
 from src.agents.common.context import ParachuteContext, SharedServices
@@ -53,29 +56,77 @@ async def test_programmatic_runner_keeps_turn_history_and_isolates_cases():
 
 @pytest.mark.asyncio
 async def test_programmatic_runner_rejects_empty_output():
+    client = AsyncOpenAI(api_key="test-key", base_url="https://example.invalid/v1")
+
+    def build_with_client():
+        agent, context = _build()
+        agent.model = OpenAIChatCompletionsModel(model="test-model", openai_client=client)
+        return agent, context
+
     async def fake_run(agent, history, *, context):
         return SimpleNamespace(final_output="", last_agent=agent)
 
     with pytest.raises(RuntimeError, match="vacia"):
-        await run_centralized_session_async(["hola"], build=_build, run=fake_run)
+        await run_centralized_session_async(["hola"], build=build_with_client, run=fake_run)
+    assert client.is_closed()
 
 
-def test_promptfoo_provider_uses_only_answer_as_output(monkeypatch):
+@pytest.mark.asyncio
+async def test_promptfoo_provider_uses_only_answer_as_output(monkeypatch):
     from evals import provider
     from src.agents.centralized.evaluation import EvaluationResult
 
-    monkeypatch.setattr(
-        provider,
-        "run_centralized_session",
-        lambda turns, **kwargs: EvaluationResult("respuesta", [{"tool": "search_faq"}], [], 25),
-    )
-    response = provider.call_api("ignored", {}, {"vars": {"turns": ["consulta"], "scenario": "faq"}})
+    async def fake_session(turns, **kwargs):
+        return EvaluationResult("respuesta", [{"tool": "search_faq"}], [], 25)
+
+    monkeypatch.setattr(provider, "run_centralized_session_async", fake_session)
+    response = await provider.call_api("ignored", {}, {"vars": {"turns": ["consulta"], "scenario": "faq"}})
     assert response["output"] == "respuesta"
     assert response["metadata"]["tool_calls"][0]["tool"] == "search_faq"
     assert response["latencyMs"] == 25
 
 
-def test_promptfoo_provider_handles_invalid_turns():
+@pytest.mark.asyncio
+async def test_promptfoo_provider_handles_invalid_turns():
     from evals.provider import call_api
 
-    assert "error" in call_api("", {}, {"vars": {"turns": 42}})
+    assert "error" in await call_api("", {}, {"vars": {"turns": 42}})
+
+
+@pytest.mark.asyncio
+async def test_promptfoo_provider_closes_each_client_on_one_persistent_loop(monkeypatch):
+    from evals import provider
+
+    loop = asyncio.get_running_loop()
+    clients = []
+
+    def build_with_client():
+        agent, context = _build()
+        client = AsyncOpenAI(api_key="test-key", base_url="https://example.invalid/v1")
+        agent.model = OpenAIChatCompletionsModel(model="test-model", openai_client=client)
+        clients.append(client)
+        return agent, context
+
+    async def fake_run(agent, history, *, context):
+        assert asyncio.get_running_loop() is loop
+        assert not clients[-1].is_closed()
+        return SimpleNamespace(
+            final_output="respuesta",
+            last_agent=agent,
+            to_input_list=lambda: history + [{"role": "assistant", "content": "respuesta"}],
+        )
+
+    async def session(turns, **kwargs):
+        return await run_centralized_session_async(
+            turns, build=build_with_client, run=fake_run, **kwargs
+        )
+
+    monkeypatch.setattr(provider, "run_centralized_session_async", session)
+    for _ in range(3):
+        response = await provider.call_api(
+            "consulta", {}, {"vars": {"scenario": "faq", "turns": ["consulta"]}}
+        )
+        assert response["output"] == "respuesta"
+        assert response["metadata"]["tool_calls"] == []
+        assert clients[-1].is_closed()
+    assert len(clients) == 3

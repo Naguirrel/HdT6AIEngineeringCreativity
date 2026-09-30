@@ -8,12 +8,12 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from src.agents.centralized.evaluation import run_centralized_session
+from src.agents.centralized.evaluation import run_centralized_session_async
 from src.config import ConfigError
 from evals.fixtures.weather import FixtureError, make_weather_service
 
 
-def call_api(prompt, options, context):
+async def call_api(prompt, options, context):
     """Return a Promptfoo ProviderResponse for one isolated scenario."""
     variables = context.get("vars", {})
     turns = variables.get("turns", prompt)
@@ -25,7 +25,7 @@ def call_api(prompt, options, context):
         fixed_today = date.fromisoformat(variables.get("fixed_today", "2026-09-17"))
         weather_fixture = variables.get("weather_fixture", "ideal")
         weather_service = make_weather_service(weather_fixture)
-        result = run_centralized_session(
+        result = await run_centralized_session_async(
             turns, fixed_today=fixed_today, weather_service=weather_service
         )
     except ConfigError as error:
