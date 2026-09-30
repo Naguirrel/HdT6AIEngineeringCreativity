@@ -147,7 +147,7 @@
     forbid_tools: [search_faq, check_jump_day, check_appointment_availability, create_appointment]
   assert:
     - type: regex
-      value: '([Hh]asta luego|[Gg]racias|[Aa]di[oó]s)'
+      value: '([Hh]asta luego|[Gg]racias|[Aa]di[oó]s|[Dd]e\s+[Nn]ada|[Ee]xcelente\s+[Dd][ií]a)'
     - type: python
       value: file://assertions/tool_trace.py
     - {type: latency, threshold: 60000}
