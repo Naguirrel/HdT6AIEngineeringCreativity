@@ -10,6 +10,7 @@ if str(ROOT) not in sys.path:
 
 from src.agents.centralized.evaluation import run_centralized_session
 from src.config import ConfigError
+from evals.fixtures.weather import FixtureError, make_weather_service
 
 
 def call_api(prompt, options, context):
@@ -21,10 +22,12 @@ def call_api(prompt, options, context):
     if not isinstance(turns, list):
         return {"error": "turns debe ser una lista de mensajes o una cadena."}
     try:
-        fixed_today = variables.get("fixed_today")
-        if fixed_today is not None:
-            fixed_today = date.fromisoformat(fixed_today)
-        result = run_centralized_session(turns, fixed_today=fixed_today)
+        fixed_today = date.fromisoformat(variables.get("fixed_today", "2026-09-17"))
+        weather_fixture = variables.get("weather_fixture", "ideal")
+        weather_service = make_weather_service(weather_fixture)
+        result = run_centralized_session(
+            turns, fixed_today=fixed_today, weather_service=weather_service
+        )
     except ConfigError as error:
         return {"error": f"Configuracion: {error}"}
     except ValueError as error:
@@ -39,6 +42,9 @@ def call_api(prompt, options, context):
             "tool_calls": result.tool_calls,
             "retrieved_context": result.retrieved_context,
             "latency_ms": result.latency_ms,
+            "weather_fixture": weather_fixture,
+            "weather_requests": result.weather_requests,
+            "real_open_meteo_contacted": False,
         },
         "latencyMs": result.latency_ms,
     }
