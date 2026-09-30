@@ -25,6 +25,15 @@ def test_answer_from_faq_returns_relevant_content(build_context):
     assert "P:" in answer and "R:" in answer
 
 
+def test_answer_from_faq_retrieves_camera_policy_for_gopro(build_context):
+    for query in ("¿Puedo llevar mi GoPro durante el salto?", "GoPro"):
+        context = build_context({})
+        answer = answer_from_faq(context, query)
+        policy = "no se permite llevar cámaras ni celulares personales durante el salto"
+        assert policy in answer
+        assert any(policy in entry["answer"] for entry in context.retrieved_context)
+
+
 def test_answer_from_faq_handles_no_match(build_context):
     context = build_context({})
     answer = answer_from_faq(context, "xyzzyquantumteleportation")

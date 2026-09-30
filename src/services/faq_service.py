@@ -13,7 +13,10 @@ _STOP_WORDS = {
     "mi", "para", "parachute", "persona", "por", "puedo", "que", "quiero",
     "sa", "salto", "saltar", "se", "su", "un", "una", "y", "evento",
 }
-_QUERY_ALIASES = {"pongo": "ropa", "ponerme": "ropa", "vestir": "ropa", "vestirme": "ropa", "vestimenta": "ropa"}
+_QUERY_ALIASES = {
+    "pongo": "ropa", "ponerme": "ropa", "vestir": "ropa", "vestirme": "ropa",
+    "vestimenta": "ropa", "gopro": "camaras",
+}
 
 
 class FaqServiceError(RuntimeError):
