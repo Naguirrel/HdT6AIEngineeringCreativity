@@ -23,8 +23,8 @@
     forbid_tools: [check_jump_day, create_appointment]
     min_retrieved_context: 1
   assert:
-    - type: contains
-      value: '100 kg'
+    - type: regex
+      value: '100\s*kg'
     - type: python
       value: file://assertions/tool_trace.py
     - type: factuality
