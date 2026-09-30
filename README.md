@@ -35,6 +35,7 @@ docker compose build
 | `LLM_API_KEY`  | si        | API key del proveedor compatible con OpenAI (Groq, OpenAI, etc.)     |
 | `LLM_BASE_URL` | si        | URL base de la API, p.ej. `https://api.groq.com/openai/v1`          |
 | `LLM_MODEL`    | si        | Id del modelo, p.ej. `openai/gpt-oss-20b`                            |
+| `LLM_GRADER_MODEL` | para evals | Modelo de `factuality`; en Groq, p.ej. `llama-3.1-8b-instant` |
 | `FAQ_PATH`     | no        | Ruta alterna al archivo de FAQs (por defecto `data/FAQs_...txt`)     |
 
 Open-Meteo no requiere credenciales, por lo que no tiene variable de entorno.
@@ -197,8 +198,9 @@ herramientas de negocio.
 
 - Python 3.12 con las dependencias de `requirements.txt`.
 - Node.js 22.22.0 o superior; Node 24 LTS recomendado.
-- Las variables `LLM_API_KEY`, `LLM_BASE_URL` y `LLM_MODEL` para ejecutar el
-  agente y el evaluador. `FAQ_PATH` es opcional. No se versionan valores.
+- `LLM_API_KEY`, `LLM_BASE_URL` y `LLM_MODEL` para el agente; al ejecutar
+  evaluaciones con `factuality`, también `LLM_GRADER_MODEL`. `FAQ_PATH` es
+  opcional. No se versionan claves.
 - `PROMPTFOO_PYTHON` selecciona el Python del entorno virtual. En equipos con
   directorio de usuario restringido, `PROMPTFOO_CONFIG_DIR` puede señalar un
   directorio local ignorado por Git. `PROMPTFOO_DISABLE_TELEMETRY=1` desactiva
@@ -233,16 +235,24 @@ Si `PROMPTFOO_PYTHON` apunta fuera de `.venv`, puede aparecer
 `ModuleNotFoundError: No module named 'agents'`. La instalación por sí sola no
 configura esa variable para terminales futuras.
 
-Configura las tres variables `LLM_*` mediante un gestor de secretos o un archivo
+Configura las cuatro variables `LLM_*` mediante un gestor de secretos o un archivo
 `.env` local ignorado por Git. Promptfoo admite `--env-file .env` al ejecutar
 los scripts; el archivo debe contener los valores reales en el equipo del
 operador. El modelo evaluado usa el SDK de OpenAI Agents y `LLM_*`. El
 evaluador de `factuality` es otro provider Promptfoo, declarado por separado
-como `openai:chat:{{ env.LLM_MODEL }}` con `apiBaseUrl` desde `LLM_BASE_URL` y
-`apiKeyEnvar: LLM_API_KEY`. Ambos pueden apuntar al mismo servicio, pero sus
-llamadas y resultados son distintos. El evaluador añade llamadas y puede
-aumentar costo y tiempo. Debe ser un modelo compatible con Chat Completions y
-capaz de responder al prompt de calificacion de Promptfoo.
+como `openai:chat:{{ env.LLM_GRADER_MODEL }}`. Reutiliza `LLM_BASE_URL` y
+`LLM_API_KEY`; no cambia `LLM_MODEL` del agente. Para Groq, el ejemplo de
+`.env.example` usa `llama-3.1-8b-instant` como grader rápido. Se puede poner
+el mismo valor en `LLM_GRADER_MODEL` y `LLM_MODEL`, aunque se recomienda un
+modelo rápido para evitar demoras en la calificación. Debe ser compatible con
+Chat Completions y responder al prompt de `factuality` de Promptfoo.
+
+Promptfoo 0.123.1 aplica `REQUEST_TIMEOUT_MS: 45000` desde `env` en
+`evals/promptfooconfig.yaml` a cada solicitud HTTP del grader (45 segundos).
+El grader tiene `maxRetries: 0`, por lo que un timeout se registra como fallo
+en lugar de repetir una llamada bloqueada. Este límite no acorta las llamadas
+del agente Python: usa su propio cliente del SDK. Las assertions de
+`factuality` siguen activas.
 
 ### Validación, ejecución y reportes
 
@@ -329,16 +339,17 @@ las 32 evaluaciones: requiere las credenciales y una corrida completa.
 | 12 casos FAQ | Implementados; ejecución completa pendiente |
 | 20 casos de citas | Implementados; ejecución completa pendiente |
 | Primeros 3 casos FAQ | **3/3 aprobados en una corrida real parcial anterior** (`faq_place_date`, `faq_weight`, `faq_camera`) |
-| Suite Python | **137 aprobadas** en la verificación actual |
+| Suite Python | **138 aprobadas** en la verificación actual |
 | Configuración Promptfoo | Válida en la verificación actual |
 | Evaluación completa de 32 casos | Pendiente |
 | Reporte HTML/JSON | Pendiente; ninguno de los dos archivos existe aún |
 
 Los 3/3 son un resultado **parcial e histórico**, no el porcentaje final. La
-base local de Promptfoo también conserva intentos posteriores incompletos: el
-más reciente registra **1 aprobado, 0 fallidos y 4 errores** en cinco casos
-FAQ. Esos errores aún requieren diagnóstico; no se deben sustituir ni ocultar
-con el resultado anterior. La última corrida completa de los 12 FAQ, de los
+base local de Promptfoo también conserva intentos posteriores incompletos:
+uno registra **1 aprobado, 0 fallidos y 4 errores** en cinco casos FAQ. La
+evaluación `eval-Mxc-2026-09-30T18:59:19` quedó pausada mientras esperaba un
+grader de `factuality`. No se deben sustituir ni ocultar estos intentos con
+el resultado anterior. La última corrida completa de los 12 FAQ, de los
 20 casos de citas y de los 32 casos combinados sigue pendiente.
 
 Un intento inicial tuvo un problema de selección de Python y no encontró el
@@ -346,9 +357,9 @@ módulo `agents`; después de configurar `PROMPTFOO_PYTHON` se obtuvo el 3/3
 parcial usando el agente real con Groq. Las advertencias
 `OPENAI_API_KEY is not set, skipping trace export` (exportación opcional de
 trazas del SDK) y la advertencia experimental de Node no impidieron esa
-ejecución. La evaluación usa `LLM_API_KEY`, `LLM_BASE_URL` y `LLM_MODEL`; `.env`
-está ignorado por Git y sus valores no deben aparecer en documentación ni
-reportes.
+ejecución. La evaluación usa `LLM_API_KEY`, `LLM_BASE_URL`, `LLM_MODEL` y
+`LLM_GRADER_MODEL`; `.env` está ignorado por Git y sus valores no deben
+aparecer en documentación ni reportes.
 
 ### Trabajo pendiente
 

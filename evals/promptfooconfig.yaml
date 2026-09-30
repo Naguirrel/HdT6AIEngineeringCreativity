@@ -1,4 +1,6 @@
 description: Parachute S.A. centralized supervisor evaluations
+env:
+  REQUEST_TIMEOUT_MS: 45000
 prompts:
   - '{{ turns }}'
 providers:
@@ -8,10 +10,11 @@ defaultTest:
   options:
     disableVarExpansion: true
     provider:
-      id: 'openai:chat:{{ env.LLM_MODEL }}'
+      id: 'openai:chat:{{ env.LLM_GRADER_MODEL }}'
       config:
         apiBaseUrl: '{{ env.LLM_BASE_URL }}'
         apiKeyEnvar: LLM_API_KEY
+        maxRetries: 0
         omitDefaults: true
         showThinking: false
   assert:

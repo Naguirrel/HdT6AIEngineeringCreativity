@@ -12,12 +12,13 @@ La integración, el provider Python, el runner programático y los nueve perfile
 meteorológicos simulados están implementados. Hay **32 casos definidos**:
 12 FAQ y 20 de citas. Una corrida real parcial anterior aprobó los primeros
 tres FAQ (`faq_place_date`, `faq_weight`, `faq_camera`), **3/3**. La base local
-también conserva intentos posteriores incompletos; el más reciente registra
-1 aprobado y 4 errores de ejecución en cinco FAQ. Esos errores aún no se han
-diagnosticado. **No** se ha completado la corrida de 12 FAQ, la de 20 citas ni
+también conserva intentos posteriores incompletos; uno registra 1 aprobado y
+4 errores de ejecución en cinco FAQ. La evaluación
+`eval-Mxc-2026-09-30T18:59:19` quedó pausada durante la calificación de
+`factuality`. **No** se ha completado la corrida de 12 FAQ, la de 20 citas ni
 la de 32 casos. Los reportes HTML/JSON aún no existen.
 
-La verificación Python actual aprobó **137 pruebas** y `npm run eval:validate`
+La verificación Python actual aprobó **138 pruebas** y `npm run eval:validate`
 confirmó que la configuración de Promptfoo es válida. El resultado 3/3 es
 parcial e histórico; no representa el porcentaje final de la hoja.
 
@@ -66,7 +67,12 @@ Estas variables solo duran la sesión actual; configurarlas de nuevo en cada
 terminal. `PROMPTFOO_PYTHON` debe apuntar a `.venv\Scripts\python.exe`.
 Si apunta a otro intérprete, Promptfoo puede fallar con
 `ModuleNotFoundError: No module named 'agents'`. El agente y el evaluador
-usan los nombres de entorno `LLM_API_KEY`, `LLM_BASE_URL` y `LLM_MODEL`.
+usan `LLM_API_KEY` y `LLM_BASE_URL`. El agente usa `LLM_MODEL`; el grader de
+`factuality` usa `LLM_GRADER_MODEL`. Para Groq, configurar en `.env` local
+`LLM_GRADER_MODEL=llama-3.1-8b-instant` es un ejemplo rápido. Puede igualar
+`LLM_MODEL` si se desea, pero se recomienda un grader rápido. El YAML fija
+`REQUEST_TIMEOUT_MS: 45000` para las solicitudes HTTP de Promptfoo y
+`maxRetries: 0` para el grader; no quitar la assertion `factuality`.
 No imprimir sus valores.
 
 ## Procedimiento para continuar
