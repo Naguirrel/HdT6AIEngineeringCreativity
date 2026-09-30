@@ -50,7 +50,7 @@
     min_retrieved_context: 1
   assert:
     - type: regex
-      value: '(?:[Aa]compa[ñn]ad[oa]s?|[Aa]utorizaci[oó]n)[\s\S]{0,80}\b(?:[Pp]adres?|[Tt]utores?)\b|\b(?:[Pp]adres?|[Tt]utores?)\b[\s\S]{0,80}(?:[Aa]compa[ñn]ad[oa]s?|[Aa]utorizaci[oó]n)'
+      value: '(?:[Aa]compa[ñn]ad[oa]s?|[Aa]compa[ñn]amiento|[Aa]utorizaci[oó]n)[\s\S]{0,80}\b(?:[Pp]adres?|[Tt]utores?)\b|\b(?:[Pp]adres?|[Tt]utores?)\b[\s\S]{0,80}(?:[Aa]compa[ñn]ad[oa]s?|[Aa]compa[ñn]amiento|[Aa]utorizaci[oó]n)'
     - type: regex
       value: '(carta|responsabilidad)'
     - type: python
