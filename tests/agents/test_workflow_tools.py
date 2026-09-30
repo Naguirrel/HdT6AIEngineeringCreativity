@@ -31,6 +31,16 @@ def test_answer_from_faq_handles_no_match(build_context):
     assert "No se encontro" in answer
 
 
+def test_answer_from_faq_abstains_on_missing_price(build_context):
+    context = build_context({})
+    assert "No se encontro" in answer_from_faq(context, "¿Cuánto cuesta el salto?")
+
+
+def test_answer_from_faq_includes_contact_from_informative_section(build_context):
+    context = build_context({})
+    assert "+502 2300-0000" in answer_from_faq(context, "¿Cuál es el teléfono?")
+
+
 def test_evaluate_jump_day_rejects_invalid_format(build_context):
     context = build_context({})
     result = evaluate_jump_day(context, "29/09/2026")
