@@ -1,4 +1,5 @@
 from datetime import date
+from urllib.parse import parse_qs, urlsplit
 
 import pytest
 import requests
@@ -42,7 +43,7 @@ def test_uses_explicit_units_in_request(requests_mock):
     requests_mock.get(BASE_URL, json=daily_payload(TARGET_DATE.isoformat()))
     make_client().get_weather(TARGET_DATE)
 
-    query = requests_mock.last_request.qs
+    query = parse_qs(urlsplit(requests_mock.last_request.url).query)
     assert query["wind_speed_unit"] == ["kmh"]
     assert query["precipitation_unit"] == ["mm"]
     assert query["temperature_unit"] == ["celsius"]
