@@ -39,7 +39,7 @@ class HandoffReason(BaseModel):
 
 
 def _log_handoff_reason(wrapper: RunContextWrapper[ParachuteContext], data: HandoffReason) -> None:
-    log_event(architecture=wrapper.context.architecture, handoff_reason=data.reason)
+    log_event(architecture=wrapper.context.architecture, handoff_reason_present=bool(data.reason))
 
 FAQ_DECENTRALIZED_INSTRUCTIONS = (
     FAQ_INSTRUCTIONS

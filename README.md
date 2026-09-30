@@ -123,6 +123,16 @@ total, segun documenta Open-Meteo).
 
 ## Observability
 
+Cada `ParachuteContext` conserva una traza estructurada de las cuatro tools de
+negocio (`search_faq`, `check_jump_day`, `check_appointment_availability`,
+`create_appointment`). `context.get_tool_trace()` devuelve eventos ordenados con
+`sequence`, `tool`, `arguments`, `result` y `status`. Las consultas FAQ se
+representan por longitud y SHA-256; nombre y contacto se reducen a indicadores
+de presencia. La traza pertenece al contexto de la sesion y no contiene los
+valores de credenciales ni datos de contacto completos. Las delegaciones
+`as_tool()` y los handoffs del SDK no se incluyen en esta traza de negocio;
+su instrumentacion requiere observar eventos del Runner en una capa separada.
+
 `src/observability.py` provee logging estructurado (`architecture=... agent=...
 tool=... requested_date=... weather_check_result=... jump_assessment=...
 handoff=... calendar_write_attempt=... calendar_write_result=...`), usado por

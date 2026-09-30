@@ -6,6 +6,7 @@ el run, sin depender de que el LLM recuerde datos en texto libre.
 """
 
 from dataclasses import dataclass, field
+from copy import deepcopy
 from datetime import date
 import re
 import unicodedata
@@ -36,6 +37,22 @@ class ParachuteContext:
     appointment_data: AppointmentData | None = None
     appointment_record: AppointmentRecord | None = None
     confirmed_tandem_date: date | None = None
+    _tool_trace: list[dict] = field(default_factory=list, repr=False)
+
+    def record_tool_event(self, tool: str, arguments: dict, result: dict, status: str) -> None:
+        if status not in {"success", "error"}:
+            raise ValueError("El estado de la herramienta debe ser success o error.")
+        self._tool_trace.append({
+            "sequence": len(self._tool_trace) + 1,
+            "tool": tool,
+            "arguments": deepcopy(arguments),
+            "result": deepcopy(result),
+            "status": status,
+        })
+
+    def get_tool_trace(self) -> list[dict]:
+        """Return a copy so callers cannot alter the session's recorded events."""
+        return deepcopy(self._tool_trace)
 
     def observe_user_message(self, message: str) -> None:
         """Record an explicit user confirmation for the currently assessed marginal day."""
