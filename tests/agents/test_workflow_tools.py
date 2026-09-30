@@ -5,9 +5,9 @@ que invocan las tres arquitecturas (centralizada, jerarquica, descentralizada),
 por lo que probarlas aqui cubre el comportamiento comun a las tres.
 """
 
-from datetime import date, timedelta
+from datetime import timedelta
 
-from tests.agents.conftest import make_snapshot
+from tests.agents.conftest import FIXED_TODAY, make_snapshot
 
 from src.domain.weather_models import Decision
 from src.integrations.open_meteo import OpenMeteoError
@@ -16,7 +16,7 @@ from src.tools.calendar_tools import book_appointment, evaluate_availability
 from src.tools.faq_tools import answer_from_faq
 from src.tools.weather_tools import evaluate_jump_day
 
-TOMORROW = date.today() + timedelta(days=1)
+TOMORROW = FIXED_TODAY + timedelta(days=1)
 
 
 def test_answer_from_faq_returns_relevant_content(build_context):
@@ -59,7 +59,7 @@ def test_evaluate_jump_day_stores_assessment_in_context(build_context):
 
 def test_evaluate_jump_day_rejects_date_outside_horizon(build_context):
     context = build_context({})
-    too_far = date.today() + timedelta(days=200)
+    too_far = FIXED_TODAY + timedelta(days=200)
     result = evaluate_jump_day(context, too_far.isoformat())
     assert "Error" in result
     assert context.jump_assessment is None
@@ -220,6 +220,20 @@ def test_out_of_range_new_date_clears_previous_assessment(build_context):
     evaluate_jump_day(context, TOMORROW.isoformat())
     assert "Error" in evaluate_jump_day(context, (TOMORROW + timedelta(days=30)).isoformat())
     assert context.jump_assessment is None
+
+
+def test_weather_tool_uses_injected_today_at_both_horizon_boundaries(build_context):
+    last_day = FIXED_TODAY + timedelta(days=15)
+    context = build_context({
+        FIXED_TODAY: make_snapshot(FIXED_TODAY),
+        last_day: make_snapshot(last_day),
+    })
+    assert "IDEAL" in evaluate_jump_day(context, FIXED_TODAY.isoformat())
+    assert "IDEAL" in evaluate_jump_day(context, last_day.isoformat())
+    assert "ya paso" in evaluate_jump_day(context, (FIXED_TODAY - timedelta(days=1)).isoformat())
+    assert "fuera del horizonte" in evaluate_jump_day(
+        context, (FIXED_TODAY + timedelta(days=16)).isoformat()
+    )
 
 
 def test_booking_tool_reports_invalid_input_without_using_capacity(build_context):

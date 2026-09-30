@@ -5,12 +5,14 @@ mismo objeto de contexto (RunContextWrapper[ParachuteContext]) a lo largo de tod
 el run, sin depender de que el LLM recuerde datos en texto libre.
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date
 import re
 import unicodedata
+from typing import Callable
 
 from src.domain.appointment_models import AppointmentData, AppointmentRecord
+from src.domain.clock import current_guatemala_date
 from src.domain.weather_models import JumpAssessment
 from src.services.calendar_service import CalendarService
 from src.services.faq_service import FaqService
@@ -28,6 +30,7 @@ class SharedServices:
 class ParachuteContext:
     services: SharedServices
     architecture: str = "unknown"
+    today: Callable[[], date] = field(default=current_guatemala_date, repr=False)
     requested_date: date | None = None
     jump_assessment: JumpAssessment | None = None
     appointment_data: AppointmentData | None = None

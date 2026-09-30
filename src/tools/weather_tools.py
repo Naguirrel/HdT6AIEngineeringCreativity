@@ -56,7 +56,7 @@ def evaluate_jump_day(context: ParachuteContext, date_str: str) -> str:
         return f"Formato de fecha invalido: '{date_str}'. Usa YYYY-MM-DD."
 
     try:
-        assessment = context.services.weather_service.check_jump_day(parsed_date, date.today())
+        assessment = context.services.weather_service.check_jump_day(parsed_date, context.today())
     except WeatherServiceError as error:
         log_event(architecture=context.architecture, tool="check_jump_day", weather_check_result="error")
         return f"Error: {error}"

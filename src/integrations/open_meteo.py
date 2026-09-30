@@ -6,6 +6,7 @@ from datetime import date
 import requests
 
 from src.domain.weather_models import WeatherSnapshot
+from src.domain.clock import GUATEMALA_TIMEZONE_NAME
 
 DAILY_VARIABLES = [
     "wind_gusts_10m_max",
@@ -33,7 +34,7 @@ class OpenMeteoClient:
             "latitude": self.latitude,
             "longitude": self.longitude,
             "daily": ",".join(DAILY_VARIABLES),
-            "timezone": "auto",
+            "timezone": GUATEMALA_TIMEZONE_NAME,
             "wind_speed_unit": "kmh",
             "precipitation_unit": "mm",
             "temperature_unit": "celsius",

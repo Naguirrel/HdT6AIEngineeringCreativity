@@ -46,6 +46,7 @@ def test_uses_explicit_units_in_request(requests_mock):
     assert query["wind_speed_unit"] == ["kmh"]
     assert query["precipitation_unit"] == ["mm"]
     assert query["temperature_unit"] == ["celsius"]
+    assert query["timezone"] == ["America/Guatemala"]
 
 
 def test_http_error_raises_open_meteo_error(requests_mock):
