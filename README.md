@@ -204,20 +204,34 @@ herramientas de negocio.
   directorio local ignorado por Git. `PROMPTFOO_DISABLE_TELEMETRY=1` desactiva
   la telemetria opcional.
 
-En PowerShell, desde la raiz del repositorio:
+### Configuración local en PowerShell
+
+Desde la raíz del repositorio, instala las dependencias declaradas. Si aún no
+existe `.venv`, créalo con Python 3.12 (`py -3.12 -m venv .venv`).
 
 ```powershell
-py -3.12 -m venv .venv
-.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+.\.venv\Scripts\Activate.ps1
+python -m pip install -r requirements.txt
 npm ci
-$env:PROMPTFOO_PYTHON = (Resolve-Path .venv\Scripts\python.exe).Path
-$env:PROMPTFOO_CONFIG_DIR = Join-Path (Resolve-Path .venv).Path 'promptfoo-state'
-$env:TEMP = Join-Path (Resolve-Path .venv).Path 'tmp'
+
+$env:PROMPTFOO_PYTHON = (Resolve-Path ".\.venv\Scripts\python.exe").Path
+$env:PROMPTFOO_CONFIG_DIR = Join-Path (Resolve-Path .venv).Path "promptfoo-state"
+$env:TEMP = Join-Path (Resolve-Path .venv).Path "tmp"
 $env:TMP = $env:TEMP
 New-Item -ItemType Directory -Force $env:TEMP | Out-Null
-.\.venv\Scripts\python.exe -m pytest -q -p no:cacheprovider
-npm run eval:validate
 ```
+
+Estas variables solo existen en la sesión actual de PowerShell: al abrir otra
+terminal hay que configurarlas nuevamente. Antes de Promptfoo, comprueba que
+usa el Python con el SDK de agentes instalado:
+
+```powershell
+& "$env:PROMPTFOO_PYTHON" -c "import sys, agents; print(sys.executable); print(agents.__file__)"
+```
+
+Si `PROMPTFOO_PYTHON` apunta fuera de `.venv`, puede aparecer
+`ModuleNotFoundError: No module named 'agents'`. La instalación por sí sola no
+configura esa variable para terminales futuras.
 
 Configura las tres variables `LLM_*` mediante un gestor de secretos o un archivo
 `.env` local ignorado por Git. Promptfoo admite `--env-file .env` al ejecutar
@@ -230,14 +244,23 @@ llamadas y resultados son distintos. El evaluador añade llamadas y puede
 aumentar costo y tiempo. Debe ser un modelo compatible con Chat Completions y
 capaz de responder al prompt de calificacion de Promptfoo.
 
-### Ejecucion y reportes
+### Validación, ejecución y reportes
 
 ```powershell
+python -m pytest -q -p no:cacheprovider
+npm run eval:validate
 npm run eval -- --filter-first-n 3 --env-file .env
+npm run eval -- --filter-first-n 12 --env-file .env
 npm run eval -- --env-file .env
 npm run eval:report -- --env-file .env
 npm run eval:view
 ```
+
+Los filtros `--filter-first-n 3` y `12` recorren, respectivamente, los tres
+primeros FAQ y los doce FAQ completos, porque ese archivo aparece primero en
+`evals/promptfooconfig.yaml`. `eval:report` lanza una **nueva** evaluación
+completa y exporta sus resultados; no reutiliza una corrida previa porque el
+script tiene `--no-cache`. Inspecciona los fallos antes de versionar el reporte.
 
 `eval:report` exporta `reports/promptfoo-report.html` y
 `reports/promptfoo-results.json`. Estos archivos se versionan solo tras una
@@ -294,3 +317,64 @@ lexica; una reformulacion puede no recuperar la entrada deseada. Los casos
 solo instrumentan herramientas de negocio, no las delegaciones internas del
 SDK. No se debe interpretar un `eval:validate` exitoso como aprobacion de
 las 32 evaluaciones: requiere las credenciales y una corrida completa.
+
+### Estado de la hoja de evaluaciones
+
+| Componente | Estado |
+|---|---|
+| Integración Promptfoo | Implementada |
+| Provider Python | Implementado; ejecuta el supervisor real |
+| Arquitectura centralizada | Conectada con sesiones aisladas y reloj fijo |
+| Fixtures meteorológicos | Nueve perfiles simulados; los casos determinísticos no consultan Open-Meteo real |
+| 12 casos FAQ | Implementados; ejecución completa pendiente |
+| 20 casos de citas | Implementados; ejecución completa pendiente |
+| Primeros 3 casos FAQ | **3/3 aprobados en una corrida real parcial anterior** (`faq_place_date`, `faq_weight`, `faq_camera`) |
+| Suite Python | **137 aprobadas** en la verificación actual |
+| Configuración Promptfoo | Válida en la verificación actual |
+| Evaluación completa de 32 casos | Pendiente |
+| Reporte HTML/JSON | Pendiente; ninguno de los dos archivos existe aún |
+
+Los 3/3 son un resultado **parcial e histórico**, no el porcentaje final. La
+base local de Promptfoo también conserva intentos posteriores incompletos: el
+más reciente registra **1 aprobado, 0 fallidos y 4 errores** en cinco casos
+FAQ. Esos errores aún requieren diagnóstico; no se deben sustituir ni ocultar
+con el resultado anterior. La última corrida completa de los 12 FAQ, de los
+20 casos de citas y de los 32 casos combinados sigue pendiente.
+
+Un intento inicial tuvo un problema de selección de Python y no encontró el
+módulo `agents`; después de configurar `PROMPTFOO_PYTHON` se obtuvo el 3/3
+parcial usando el agente real con Groq. Las advertencias
+`OPENAI_API_KEY is not set, skipping trace export` (exportación opcional de
+trazas del SDK) y la advertencia experimental de Node no impidieron esa
+ejecución. La evaluación usa `LLM_API_KEY`, `LLM_BASE_URL` y `LLM_MODEL`; `.env`
+está ignorado por Git y sus valores no deben aparecer en documentación ni
+reportes.
+
+### Trabajo pendiente
+
+1. Ejecutar nuevamente `python -m pytest -q -p no:cacheprovider`.
+2. Validar con `npm run eval:validate`.
+3. Ejecutar los 12 FAQ con `npm run eval -- --filter-first-n 12 --env-file .env`.
+4. Revisar y clasificar cada fallo o error, incluidos los intentos parciales posteriores al 3/3.
+5. Corregir solo assertions frágiles cuando la respuesta sea realmente correcta.
+6. Mantener las assertions exigentes ante errores reales del agente.
+7. Ejecutar los casos de citas en grupos pequeños.
+8. Verificar herramientas, argumentos, resultados y orden mediante la metadata.
+9. Ejecutar los 32 casos.
+10. Generar HTML y JSON mediante `npm run eval:report -- --env-file .env`.
+11. Revisar ambos reportes para detectar secretos; conservar los fallos reales.
+12. Crear el commit final del reporte tras una corrida real verificada.
+13. Confirmar que `git status --short` esté vacío.
+14. Hacer push únicamente si el usuario lo solicita.
+
+### Cómo clasificar un fallo
+
+- **Error:** fallo del provider, dependencias, variables de entorno o ejecución; no se cuenta como respuesta incorrecta del agente.
+- **Fallo del agente:** respuesta incorrecta, omisión de una herramienta obligatoria, argumento erróneo u orden indebido.
+- **Assertion frágil:** respuesta semánticamente correcta que cambia solo en Markdown, espacios Unicode, acentos o redacción equivalente.
+- **Factuality:** contrastar la respuesta con el corpus FAQ o la referencia de política/fixture correspondiente; el juicio del evaluador no sustituye la evidencia.
+- **Tool execution:** contrastar la traza estructurada en `metadata`, no solo el texto final.
+
+Flexibiliza una assertion únicamente si preserva el requisito semántico que
+debía comprobar. No generes ni versiones un reporte hasta ejecutar realmente
+la evaluación completa y revisar los resultados.
