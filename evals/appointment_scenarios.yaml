@@ -16,6 +16,7 @@
   assert:
     - {type: contains, value: '2026-09-20'}
     - {type: python, value: 'file://assertions/tool_trace.py'}
+    - {type: factuality, value: 'Para el 20 de septiembre de 2026, el fixture ideal permite una cita de salto para dos personas.'}
 - description: Solicitud de cita sin fecha
   vars:
     scenario: appointment_missing_date
@@ -80,6 +81,7 @@
   assert:
     - {type: regex, value: '([Tt][aá]ndem|[Ii]nstructor experimentado)'}
     - {type: python, value: 'file://assertions/tool_trace.py'}
+    - {type: factuality, value: 'Con viento de 20 km/h, el salto es marginal y solo se permite en tándem con instructor experimentado.'}
 - description: Confirmación marginal explícita en turno posterior
   vars:
     scenario: appointment_marginal_confirmed
@@ -121,6 +123,7 @@
   assert:
     - {type: regex, value: '(28[.,]1|[Vv]iento|[Nn]o.{0,50}cita)'}
     - {type: python, value: 'file://assertions/tool_trace.py'}
+    - {type: factuality, value: 'Con viento de 28.1 km/h, las condiciones prohíben el salto y no se puede crear una cita.'}
 - description: Ráfagas mayores a 35 km por hora
   vars:
     scenario: appointment_prohibited_gusts
@@ -243,3 +246,4 @@
   assert:
     - {type: contains, value: 'www.parachutesa.gt'}
     - {type: python, value: 'file://assertions/tool_trace.py'}
+    - {type: factuality, value: 'El corpus indica que se puede reservar en www.parachutesa.gt o por WhatsApp al +502 2300-0000.'}
