@@ -4,4 +4,5 @@ prompts:
 providers:
   - id: file://provider.py
     label: Central Supervisor
-tests: file://scenarios.yaml
+tests:
+  - file://faq_scenarios.yaml
