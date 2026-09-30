@@ -11,6 +11,7 @@ from agents import RunContextWrapper, function_tool
 
 from src.agents.common.context import ParachuteContext
 from src.domain.appointment_models import AppointmentData
+from src.domain.weather_models import Decision
 from src.observability import log_event
 from src.services.calendar_service import CalendarServiceError
 
@@ -54,6 +55,14 @@ def book_appointment(
         or assessed_weather.date != requested_date
     ):
         return "No se puede crear la cita: la fecha solicitada no coincide con la evaluacion meteorologica vigente."
+
+    if context.jump_assessment.decision == Decision.MARGINAL and (
+        not is_experienced_tandem or context.confirmed_tandem_date != requested_date
+    ):
+        return (
+            "No se puede crear la cita: el usuario debe confirmar explicitamente "
+            "el tandem experimentado para esta fecha."
+        )
 
     try:
         data = AppointmentData(

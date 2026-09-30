@@ -48,6 +48,7 @@ def evaluate_jump_day(context: ParachuteContext, date_str: str) -> str:
     context.jump_assessment = None
     context.appointment_data = None
     context.appointment_record = None
+    context.confirmed_tandem_date = None
 
     try:
         parsed_date = _parse_date(date_str)

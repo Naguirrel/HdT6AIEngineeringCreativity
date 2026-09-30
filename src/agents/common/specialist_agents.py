@@ -31,7 +31,9 @@ conversacion). Pasa esa misma fecha YYYY-MM-DD a create_appointment. Usa
 check_appointment_availability para confirmar cupo y create_appointment para
 confirmar la cita, solicitando al usuario nombre,
 contacto y, si la evaluacion fue MARGINAL, confirmacion explicita de que acepta
-un salto tandem con instructor experimentado."""
+un salto tandem con instructor experimentado. Pide al usuario que escriba una
+confirmacion como 'Acepto tandem experimentado' antes de crear la cita; el
+booleano de la herramienta no sustituye esa confirmacion."""
 
 
 def build_faq_agent(model: Model, handoffs: list[Handoff | Agent] | None = None) -> Agent:

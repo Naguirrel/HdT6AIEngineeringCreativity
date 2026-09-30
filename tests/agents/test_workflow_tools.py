@@ -87,12 +87,60 @@ def test_create_appointment_requires_experienced_tandem_for_marginal(build_conte
     evaluate_jump_day(context, TOMORROW.isoformat())
 
     refused = book_appointment(context, TOMORROW.isoformat(), "Juan Perez", "juan@example.com", is_experienced_tandem=False)
-    assert "No se pudo crear la cita" in refused
+    assert "confirmar explicitamente" in refused
     assert context.appointment_record is None
 
+    asserted_by_model_only = book_appointment(
+        context, TOMORROW.isoformat(), "Juan Perez", "juan@example.com", is_experienced_tandem=True
+    )
+    assert "confirmar explicitamente" in asserted_by_model_only
+    assert context.appointment_record is None
+
+    context.observe_user_message("Sí, acepto tándem experimentado para 2026-01-01")
+    assert context.confirmed_tandem_date is None
+    context.observe_user_message(f"Sí, acepto tándem experimentado para {TOMORROW.isoformat()}")
     confirmed = book_appointment(context, TOMORROW.isoformat(), "Juan Perez", "juan@example.com", is_experienced_tandem=True)
     assert "Cita confirmada" in confirmed
     assert context.appointment_record is not None
+
+
+def test_tandem_confirmation_is_invalidated_by_new_weather_check(build_context):
+    another_day = TOMORROW + timedelta(days=1)
+    context = build_context({
+        TOMORROW: make_snapshot(TOMORROW, wind_speed_10m_kmh=25.0),
+        another_day: make_snapshot(another_day, wind_speed_10m_kmh=25.0),
+    })
+    evaluate_jump_day(context, TOMORROW.isoformat())
+    context.observe_user_message("Acepto tándem experimentado")
+    assert context.confirmed_tandem_date == TOMORROW
+    evaluate_jump_day(context, another_day.isoformat())
+    assert context.confirmed_tandem_date is None
+    refused = book_appointment(
+        context, another_day.isoformat(), "Juan Perez", "juan@example.com", is_experienced_tandem=True
+    )
+    assert "confirmar explicitamente" in refused
+    assert "no coincide" in book_appointment(
+        context, TOMORROW.isoformat(), "Juan Perez", "juan@example.com", is_experienced_tandem=True
+    )
+
+
+def test_prohibited_weather_rejects_even_with_confirmation_flag(build_context):
+    context = build_context({TOMORROW: make_snapshot(TOMORROW, precipitation_mm=1.0)})
+    evaluate_jump_day(context, TOMORROW.isoformat())
+    context.confirmed_tandem_date = TOMORROW
+    result = book_appointment(
+        context, TOMORROW.isoformat(), "Juan Perez", "juan@example.com", is_experienced_tandem=True
+    )
+    assert "No se pudo crear la cita" in result
+    assert context.appointment_record is None
+
+
+def test_user_denial_revokes_tandem_confirmation(build_context):
+    context = build_context({TOMORROW: make_snapshot(TOMORROW, wind_speed_10m_kmh=25.0)})
+    evaluate_jump_day(context, TOMORROW.isoformat())
+    context.observe_user_message("Acepto tándem experimentado")
+    context.observe_user_message("No acepto tándem experimentado")
+    assert context.confirmed_tandem_date is None
 
 
 def test_create_appointment_is_idempotent(build_context):
