@@ -43,6 +43,12 @@ def evaluate_jump_day(context: ParachuteContext, date_str: str) -> str:
     """Logica del tool check_jump_day, invocable directamente en tests."""
     log_event(architecture=context.architecture, tool="check_jump_day", requested_date=date_str)
 
+    # A failed new request must not leave an earlier day eligible for booking.
+    context.requested_date = None
+    context.jump_assessment = None
+    context.appointment_data = None
+    context.appointment_record = None
+
     try:
         parsed_date = _parse_date(date_str)
     except ValueError:
