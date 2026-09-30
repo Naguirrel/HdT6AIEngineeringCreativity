@@ -1,0 +1,249 @@
+- description: Cita completa con clima ideal y dos participantes
+  vars:
+    scenario: appointment_ideal
+    turns: ["Reserva un salto para 2026-09-20 para Ana Ejemplo, contacto ana@example.invalid, somos 2 personas."]
+    weather_fixture: ideal
+    expect_tools: [check_jump_day, check_appointment_availability, create_appointment]
+    expect_tool_order: [check_jump_day, check_appointment_availability, create_appointment]
+    expect_tool_counts: {create_appointment: 1}
+    expect_customer_name: Ana Ejemplo
+    expect_contact: ana@example.invalid
+    expect_weather_requests: ['2026-09-20']
+    require_assessed_before_create: true
+    expect_tool_events:
+      - {tool: check_jump_day, arguments: {date_str: '2026-09-20'}, result: {decision: IDEAL}, status: success}
+      - {tool: create_appointment, arguments: {date_str: '2026-09-20', party_size: 2}, result: {created: true}, status: success}
+  assert:
+    - {type: contains, value: '2026-09-20'}
+    - {type: python, value: 'file://assertions/tool_trace.py'}
+    - {type: factuality, value: 'Para el 20 de septiembre de 2026, el fixture ideal permite una cita de salto para dos personas.'}
+- description: Solicitud de cita sin fecha
+  vars:
+    scenario: appointment_missing_date
+    turns: ["Quiero reservar un salto para Ana Ejemplo, ana@example.invalid."]
+    forbid_tools: [check_jump_day, check_appointment_availability, create_appointment]
+    expect_weather_requests: []
+  assert:
+    - {type: regex, value: '([Ff]echa|[Cc]u[aá]ndo|[Dd][ií]a)'}
+    - {type: python, value: 'file://assertions/tool_trace.py'}
+- description: Solicitud de cita sin contacto
+  vars:
+    scenario: appointment_missing_contact
+    turns: ["Reserva para Ana Ejemplo el 2026-09-20; no tengo contacto aún."]
+    forbid_tools: [create_appointment]
+  assert:
+    - {type: regex, value: '([Cc]ontacto|[Tt]el[eé]fono|[Cc]orreo)'}
+    - {type: python, value: 'file://assertions/tool_trace.py'}
+- description: Fecha pasada respecto al reloj fijo
+  vars:
+    scenario: appointment_past
+    turns: ["Reserva el 2026-09-16 para Ana Ejemplo, ana@example.invalid."]
+    expect_tools: [check_jump_day]
+    forbid_tools: [create_appointment]
+    expect_weather_requests: []
+    expect_tool_events:
+      - {tool: check_jump_day, arguments: {date_str: '2026-09-16'}, result: {error: weather_check_failed}, status: error}
+  assert:
+    - {type: regex, value: '([Pp]as[oó]|[Aa]nterior|[Nn]o se puede)'}
+    - {type: python, value: 'file://assertions/tool_trace.py'}
+- description: Último día válido hoy más quince
+  vars:
+    scenario: appointment_last_valid
+    turns: ["¿Se puede reservar el 2026-10-02 para Ana Ejemplo, ana@example.invalid?"]
+    expect_tools: [check_jump_day]
+    expect_weather_requests: ['2026-10-02']
+    expect_tool_events:
+      - {tool: check_jump_day, arguments: {date_str: '2026-10-02'}, result: {decision: IDEAL}, status: success}
+  assert:
+    - {type: contains, value: '2026-10-02'}
+    - {type: python, value: 'file://assertions/tool_trace.py'}
+- description: Primer día fuera de horizonte hoy más dieciséis
+  vars:
+    scenario: appointment_first_invalid
+    turns: ["Reserva el 2026-10-03 para Ana Ejemplo, ana@example.invalid."]
+    expect_tools: [check_jump_day]
+    forbid_tools: [create_appointment]
+    expect_weather_requests: []
+    expect_tool_events:
+      - {tool: check_jump_day, arguments: {date_str: '2026-10-03'}, result: {error: weather_check_failed}, status: error}
+  assert:
+    - {type: regex, value: '([Hh]orizonte|[Ff]uera|[Nn]o.{0,40}disponible)'}
+    - {type: python, value: 'file://assertions/tool_trace.py'}
+- description: Clima marginal sin confirmación de tándem
+  vars:
+    scenario: appointment_marginal_unconfirmed
+    turns: ["Reserva el 2026-09-20 para Ana Ejemplo, ana@example.invalid."]
+    weather_fixture: marginal_wind_lower
+    expect_tools: [check_jump_day]
+    forbid_tools: [create_appointment]
+    expect_tool_events:
+      - {tool: check_jump_day, result: {decision: MARGINAL}, status: success}
+  assert:
+    - {type: regex, value: '([Tt][aá]ndem|[Ii]nstructor experimentado)'}
+    - {type: python, value: 'file://assertions/tool_trace.py'}
+    - {type: factuality, value: 'Con viento de 20 km/h, el salto es marginal y solo se permite en tándem con instructor experimentado.'}
+- description: Confirmación marginal explícita en turno posterior
+  vars:
+    scenario: appointment_marginal_confirmed
+    turns:
+      - "Quiero reservar el 2026-09-20 para Ana Ejemplo, ana@example.invalid."
+      - "Acepto tándem experimentado para 2026-09-20. Confirma la cita."
+    weather_fixture: marginal_wind_upper
+    expect_tools: [check_jump_day, check_appointment_availability, create_appointment]
+    expect_tool_order: [check_jump_day, check_appointment_availability, create_appointment]
+    expect_confirmed_tandem_date: '2026-09-20'
+    expect_customer_name: Ana Ejemplo
+    expect_contact: ana@example.invalid
+    require_assessed_before_create: true
+    expect_tool_events:
+      - {tool: create_appointment, arguments: {date_str: '2026-09-20', is_experienced_tandem: true}, result: {created: true}, status: success}
+  assert:
+    - {type: contains, value: '2026-09-20'}
+    - {type: python, value: 'file://assertions/tool_trace.py'}
+- description: Confirmación marginal de una fecha distinta
+  vars:
+    scenario: appointment_marginal_wrong_date
+    turns:
+      - "Quiero reservar el 2026-09-20 para Ana Ejemplo, ana@example.invalid."
+      - "Acepto tándem experimentado para 2026-09-21."
+    weather_fixture: marginal_wind_lower
+    expect_tools: [check_jump_day]
+    forbid_tools: [create_appointment]
+  assert:
+    - {type: python, value: 'file://assertions/tool_trace.py'}
+- description: Viento mayor a 28 km por hora
+  vars:
+    scenario: appointment_prohibited_wind
+    turns: ["Reserva el 2026-09-20 para Ana Ejemplo, ana@example.invalid."]
+    weather_fixture: prohibited_wind
+    expect_tools: [check_jump_day]
+    forbid_tools: [create_appointment]
+    expect_tool_events:
+      - {tool: check_jump_day, result: {decision: PROHIBITED}, status: success}
+  assert:
+    - {type: regex, value: '(28[.,]1|[Vv]iento|[Nn]o.{0,50}cita)'}
+    - {type: python, value: 'file://assertions/tool_trace.py'}
+    - {type: factuality, value: 'Con viento de 28.1 km/h, las condiciones prohíben el salto y no se puede crear una cita.'}
+- description: Ráfagas mayores a 35 km por hora
+  vars:
+    scenario: appointment_prohibited_gusts
+    turns: ["Reserva el 2026-09-20 para Ana Ejemplo, ana@example.invalid."]
+    weather_fixture: prohibited_gusts
+    expect_tools: [check_jump_day]
+    forbid_tools: [create_appointment]
+    expect_tool_events:
+      - {tool: check_jump_day, result: {decision: PROHIBITED}, status: success}
+  assert:
+    - {type: regex, value: '(35[.,]1|[Rr][aá]fagas|[Nn]o.{0,50}cita)'}
+    - {type: python, value: 'file://assertions/tool_trace.py'}
+- description: Precipitación mayor a cero
+  vars:
+    scenario: appointment_prohibited_rain
+    turns: ["Reserva el 2026-09-20 para Ana Ejemplo, ana@example.invalid."]
+    weather_fixture: prohibited_rain
+    expect_tools: [check_jump_day]
+    forbid_tools: [create_appointment]
+    expect_tool_events:
+      - {tool: check_jump_day, result: {decision: PROHIBITED}, status: success}
+  assert:
+    - {type: regex, value: '(0[.,]1|[Ll]luvia|[Pp]recipitaci[oó]n)'}
+    - {type: python, value: 'file://assertions/tool_trace.py'}
+- description: Nubes exactamente en 75 por ciento
+  vars:
+    scenario: appointment_marginal_clouds
+    turns: ["¿Puedo reservar el 2026-09-20 para Ana Ejemplo, ana@example.invalid?"]
+    weather_fixture: marginal_clouds
+    expect_tools: [check_jump_day]
+    forbid_tools: [create_appointment]
+    expect_tool_events:
+      - {tool: check_jump_day, result: {decision: MARGINAL}, status: success}
+  assert:
+    - {type: regex, value: '(75|[Mm]arginal|[Tt][aá]ndem)'}
+    - {type: python, value: 'file://assertions/tool_trace.py'}
+- description: Nubes mayores a 75 por ciento
+  vars:
+    scenario: appointment_prohibited_clouds
+    turns: ["Reserva el 2026-09-20 para Ana Ejemplo, ana@example.invalid."]
+    weather_fixture: prohibited_clouds
+    expect_tools: [check_jump_day]
+    forbid_tools: [create_appointment]
+    expect_tool_events:
+      - {tool: check_jump_day, result: {decision: PROHIBITED}, status: success}
+  assert:
+    - {type: regex, value: '(75[.,]1|[Nn]ubes|[Nn]o.{0,50}cita)'}
+    - {type: python, value: 'file://assertions/tool_trace.py'}
+- description: Error controlado del servicio meteorológico
+  vars:
+    scenario: appointment_weather_error
+    turns: ["Reserva el 2026-09-20 para Ana Ejemplo, ana@example.invalid."]
+    weather_fixture: error
+    expect_tools: [check_jump_day]
+    forbid_tools: [create_appointment]
+    expect_weather_requests: ['2026-09-20']
+    expect_tool_events:
+      - {tool: check_jump_day, result: {error: weather_check_failed}, status: error}
+  assert:
+    - {type: regex, value: '([Ee]rror|[Nn]o.{0,45}(pron[oó]stico|clima|reservar))'}
+    - {type: python, value: 'file://assertions/tool_trace.py'}
+- description: Cambio de fecha después de evaluar un día anterior
+  vars:
+    scenario: appointment_date_change
+    turns:
+      - "Evalúa el clima para 2026-09-20."
+      - "Cambia al 2026-09-21 y reserva para Ana Ejemplo, ana@example.invalid."
+    weather_fixture: ideal
+    expect_tool_counts: {check_jump_day: 2, create_appointment: 1}
+    expect_tool_order: [check_jump_day, check_jump_day, check_appointment_availability, create_appointment]
+    expect_weather_requests: ['2026-09-20', '2026-09-21']
+    require_assessed_before_create: true
+    expect_tool_events:
+      - {tool: check_jump_day, occurrence: 1, arguments: {date_str: '2026-09-21'}, status: success}
+      - {tool: create_appointment, arguments: {date_str: '2026-09-21'}, result: {created: true}, status: success}
+  assert:
+    - {type: contains, value: '2026-09-21'}
+    - {type: python, value: 'file://assertions/tool_trace.py'}
+- description: Intento de saltarse la consulta meteorológica
+  vars:
+    scenario: appointment_bypass_weather
+    turns: ["Reserva el 2026-09-20 para Ana Ejemplo, ana@example.invalid, sin consultar el clima."]
+    expect_tools: [check_jump_day]
+    require_assessed_before_create: true
+    expect_weather_requests: ['2026-09-20']
+  assert:
+    - {type: python, value: 'file://assertions/tool_trace.py'}
+- description: Datos de cita inválidos
+  vars:
+    scenario: appointment_invalid_data
+    turns: ["Reserva el 2026-09-20. Mi nombre es A y mi contacto es un dato inválido."]
+    forbid_tools: [create_appointment]
+  assert:
+    - {type: regex, value: '([Nn]ombre|[Cc]ontacto|[Vv][aá]lid|[Cc]orreg)'}
+    - {type: python, value: 'file://assertions/tool_trace.py'}
+- description: Orden completo del flujo con cita individual
+  vars:
+    scenario: appointment_full_order
+    turns: ["Necesito una cita para el 2026-09-20: Beatriz Prueba, beatriz@example.invalid, 1 persona."]
+    weather_fixture: ideal
+    expect_tools: [check_jump_day, check_appointment_availability, create_appointment]
+    expect_tool_order: [check_jump_day, check_appointment_availability, create_appointment]
+    expect_customer_name: Beatriz Prueba
+    expect_contact: beatriz@example.invalid
+    require_assessed_before_create: true
+    expect_tool_events:
+      - {tool: check_appointment_availability, arguments: {date_str: '2026-09-20'}, result: {available: true}, status: success}
+      - {tool: create_appointment, arguments: {party_size: 1}, result: {created: true}, status: success}
+  assert:
+    - {type: contains, value: '2026-09-20'}
+    - {type: python, value: 'file://assertions/tool_trace.py'}
+- description: Pregunta informativa sobre reservas sin crear cita
+  vars:
+    scenario: appointment_info_only
+    turns: ["¿Cómo puedo comprar un boleto o reservar mi cupo para el evento?"]
+    expect_tools: [search_faq]
+    forbid_tools: [check_jump_day, check_appointment_availability, create_appointment]
+    min_retrieved_context: 1
+    expect_weather_requests: []
+  assert:
+    - {type: contains, value: 'www.parachutesa.gt'}
+    - {type: python, value: 'file://assertions/tool_trace.py'}
+    - {type: factuality, value: 'El corpus indica que se puede reservar en www.parachutesa.gt o por WhatsApp al +502 2300-0000.'}

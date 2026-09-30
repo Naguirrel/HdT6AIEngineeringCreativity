@@ -1,0 +1,22 @@
+description: Parachute S.A. centralized supervisor evaluations
+prompts:
+  - '{{ turns }}'
+providers:
+  - id: file://provider.py
+    label: Central Supervisor
+defaultTest:
+  options:
+    disableVarExpansion: true
+    provider:
+      id: 'openai:chat:{{ env.LLM_MODEL }}'
+      config:
+        apiBaseUrl: '{{ env.LLM_BASE_URL }}'
+        apiKeyEnvar: LLM_API_KEY
+        omitDefaults: true
+        showThinking: false
+  assert:
+    - type: latency
+      threshold: 180000
+tests:
+  - file://faq_scenarios.yaml
+  - file://appointment_scenarios.yaml

@@ -1,0 +1,168 @@
+- description: FAQ lugar y fecha del evento
+  vars:
+    scenario: faq_place_date
+    turns: ["¿Cuándo y dónde se realizará el evento de paracaidismo?"]
+    expect_tools: [search_faq]
+    forbid_tools: [check_jump_day, check_appointment_availability, create_appointment]
+    min_retrieved_context: 1
+  assert:
+    - type: contains
+      value: '29 de septiembre de 2026'
+    - type: regex
+      value: 'Puerto\s+San\s*Jos'
+    - type: python
+      value: file://assertions/tool_trace.py
+    - type: factuality
+      value: 'El evento será el 29 de septiembre de 2026 en la Pista de Aterrizaje de Puerto San José, Escuintla, Guatemala, a partir de las 07:00 AM.'
+    - {type: latency, threshold: 60000}
+- description: FAQ peso máximo
+  vars:
+    scenario: faq_weight
+    turns: ["¿Cuál es el límite de peso para saltar?"]
+    expect_tools: [search_faq]
+    forbid_tools: [check_jump_day, create_appointment]
+    min_retrieved_context: 1
+  assert:
+    - type: regex
+      value: '100\s*kg'
+    - type: python
+      value: file://assertions/tool_trace.py
+    - type: factuality
+      value: 'El límite de peso máximo es de 100 kg (220 lbs).'
+    - {type: latency, threshold: 60000}
+- description: FAQ cámaras personales GoPro
+  vars:
+    scenario: faq_camera
+    turns: ["¿Puedo llevar mi GoPro durante el salto?"]
+    expect_tools: [search_faq]
+    forbid_tools: [check_jump_day, create_appointment]
+    min_retrieved_context: 1
+  assert:
+    - type: regex
+      value: '[Nn]o.{0,35}(permite|puede|permitido).{0,45}(c[aá]mara|GoPro|Go-Pro)'
+    - type: python
+      value: file://assertions/tool_trace.py
+    - type: factuality
+      value: 'No se permite llevar cámaras ni celulares personales durante el salto.'
+    - {type: latency, threshold: 60000}
+- description: FAQ requisito para participante de 17 años
+  vars:
+    scenario: faq_minor
+    turns: ["Tengo 17 años, ¿qué necesito para participar?"]
+    expect_tools: [search_faq]
+    forbid_tools: [check_jump_day, create_appointment]
+    min_retrieved_context: 1
+  assert:
+    - type: regex
+      value: '(padres|tutores)'
+    - type: regex
+      value: '(carta|responsabilidad)'
+    - type: python
+      value: file://assertions/tool_trace.py
+    - type: factuality
+      value: 'Las personas de 16 y 17 años pueden saltar acompañadas por padres o tutores legales y deben firmar la carta de responsabilidad en el lugar.'
+    - {type: latency, threshold: 60000}
+- description: FAQ ropa recomendada
+  vars:
+    scenario: faq_clothes
+    turns: ["¿Qué ropa debo usar para el salto?"]
+    expect_tools: [search_faq]
+    forbid_tools: [check_jump_day, create_appointment]
+    min_retrieved_context: 1
+  assert:
+    - type: regex
+      value: '(ropa c[oó]moda|ropa deportiva|tenis)'
+    - type: python
+      value: file://assertions/tool_trace.py
+    - type: factuality
+      value: 'Se recomienda ropa cómoda y deportiva y tenis con cintas bien sujetas; se deben evitar sandalias, tacones y botas pesadas.'
+    - {type: latency, threshold: 60000}
+- description: FAQ contacto oficial
+  vars:
+    scenario: faq_contact
+    turns: ["¿Cuál es el teléfono de contacto de Parachute S.A.?"]
+    expect_tools: [search_faq]
+    forbid_tools: [check_jump_day, create_appointment]
+    min_retrieved_context: 1
+  assert:
+    - type: contains
+      value: '+502 2300-0000'
+    - type: python
+      value: file://assertions/tool_trace.py
+    - type: factuality
+      value: 'El WhatsApp o teléfono oficial es +502 2300-0000.'
+    - {type: latency, threshold: 60000}
+- description: FAQ precio ausente del corpus
+  vars:
+    scenario: faq_missing_price
+    turns: ["¿Cuál es el precio exacto en quetzales de un salto tándem básico?"]
+    expect_tools: [search_faq]
+    forbid_tools: [check_jump_day, check_appointment_availability, create_appointment]
+  assert:
+    - type: regex
+      value: '([Nn]o.{0,80}(informaci[oó]n|precio|indica|especifica)|precio.{0,50}(no|desconocido))'
+    - type: not-contains
+      value: 'Q500'
+    - type: python
+      value: file://assertions/tool_trace.py
+    - {type: latency, threshold: 60000}
+- description: FAQ seguro médico ausente del corpus
+  vars:
+    scenario: faq_missing_insurance
+    turns: ["¿Qué seguro médico incluye el salto y cuál es su cobertura?"]
+    expect_tools: [search_faq]
+    forbid_tools: [check_jump_day, check_appointment_availability, create_appointment]
+  assert:
+    - type: regex
+      value: '([Nn]o.{0,80}(informaci[oó]n|seguro|indica|especifica)|seguro.{0,50}(no|desconocido))'
+    - type: python
+      value: file://assertions/tool_trace.py
+    - {type: latency, threshold: 60000}
+- description: Pregunta completamente fuera del dominio
+  vars:
+    scenario: faq_out_of_domain
+    turns: ["¿Quién ganó el mundial de ajedrez de 1972?"]
+    forbid_tools: [check_jump_day, check_appointment_availability, create_appointment]
+  assert:
+    - type: regex
+      value: '(paracaidismo|evento|informaci[oó]n|ayudar)'
+    - type: python
+      value: file://assertions/tool_trace.py
+    - {type: latency, threshold: 60000}
+- description: Saludo sin herramientas de negocio
+  vars:
+    scenario: greeting
+    turns: ["Hola, buen día"]
+    forbid_tools: [search_faq, check_jump_day, check_appointment_availability, create_appointment]
+  assert:
+    - type: regex
+      value: '(Hola|[Bb]uen|[Aa]yudar)'
+    - type: python
+      value: file://assertions/tool_trace.py
+    - {type: latency, threshold: 60000}
+- description: Despedida sin herramientas de negocio
+  vars:
+    scenario: farewell
+    turns: ["Gracias por la ayuda, hasta luego"]
+    forbid_tools: [search_faq, check_jump_day, check_appointment_availability, create_appointment]
+  assert:
+    - type: regex
+      value: '([Hh]asta luego|[Gg]racias|[Aa]di[oó]s)'
+    - type: python
+      value: file://assertions/tool_trace.py
+    - {type: latency, threshold: 60000}
+- description: FAQ ropa reformulada
+  vars:
+    scenario: faq_clothes_rephrased
+    turns: ["¿Cómo debería vestirme para la actividad aérea?"]
+    expect_tools: [search_faq]
+    forbid_tools: [check_jump_day, create_appointment]
+    min_retrieved_context: 1
+  assert:
+    - type: regex
+      value: '(tenis|deportiv|c[oó]moda)'
+    - type: python
+      value: file://assertions/tool_trace.py
+    - type: factuality
+      value: 'Se recomienda usar ropa cómoda y deportiva y tenis con cintas bien sujetas.'
+    - {type: latency, threshold: 60000}
