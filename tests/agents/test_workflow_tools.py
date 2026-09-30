@@ -162,3 +162,12 @@ def test_out_of_range_new_date_clears_previous_assessment(build_context):
     evaluate_jump_day(context, TOMORROW.isoformat())
     assert "Error" in evaluate_jump_day(context, (TOMORROW + timedelta(days=30)).isoformat())
     assert context.jump_assessment is None
+
+
+def test_booking_tool_reports_invalid_input_without_using_capacity(build_context):
+    context = build_context({TOMORROW: make_snapshot(TOMORROW)})
+    evaluate_jump_day(context, TOMORROW.isoformat())
+    result = book_appointment(context, TOMORROW.isoformat(), "   ", "juan@example.com", party_size=0)
+    assert "nombre" in result
+    assert context.appointment_record is None
+    assert context.services.calendar_service.check_availability(TOMORROW)

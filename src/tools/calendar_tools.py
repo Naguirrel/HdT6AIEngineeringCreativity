@@ -55,13 +55,17 @@ def book_appointment(
     ):
         return "No se puede crear la cita: la fecha solicitada no coincide con la evaluacion meteorologica vigente."
 
-    data = AppointmentData(
-        customer_name=customer_name,
-        contact=contact,
-        jump_date=requested_date,
-        is_experienced_tandem=is_experienced_tandem,
-        party_size=party_size,
-    )
+    try:
+        data = AppointmentData(
+            customer_name=customer_name,
+            contact=contact,
+            jump_date=requested_date,
+            is_experienced_tandem=is_experienced_tandem,
+            party_size=party_size,
+        )
+    except ValueError as error:
+        log_event(architecture=context.architecture, tool="create_appointment", calendar_write_result="invalid_input")
+        return f"No se pudo crear la cita: {error}"
 
     try:
         record = context.services.calendar_service.create_appointment(data, context.jump_assessment)

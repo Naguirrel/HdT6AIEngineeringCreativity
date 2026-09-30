@@ -93,3 +93,38 @@ def test_create_appointment_fails_when_no_slots_left():
     service.create_appointment(make_data(customer_name="Cliente Uno"), assessment)
     with pytest.raises(CalendarServiceError):
         service.create_appointment(make_data(customer_name="Cliente Dos"), assessment)
+
+
+@pytest.mark.parametrize(
+    "overrides",
+    [
+        {"customer_name": ""},
+        {"customer_name": "   "},
+        {"customer_name": None},
+        {"customer_name": 123},
+        {"customer_name": "A" * 201},
+        {"contact": ""},
+        {"contact": "   "},
+        {"contact": None},
+        {"contact": 123},
+        {"contact": "a" * 255},
+        {"jump_date": None},
+        {"jump_date": "2026-09-29"},
+        {"party_size": 0},
+        {"party_size": -1},
+        {"party_size": True},
+        {"party_size": "2"},
+        {"is_experienced_tandem": "true"},
+    ],
+)
+def test_invalid_appointment_data_is_rejected_without_using_capacity(overrides):
+    service = InMemoryCalendarService()
+    with pytest.raises(ValueError):
+        service.create_appointment(make_data(**overrides), make_assessment(Decision.IDEAL))
+    assert service.check_availability(JUMP_DATE)
+
+
+def test_appointment_data_accepts_boundary_lengths_and_minimum_party_size():
+    data = make_data(customer_name="A" * 200, contact="c" * 254, party_size=1)
+    record = InMemoryCalendarService().create_appointment(data, make_assessment(Decision.IDEAL))
+    assert record.data == data
