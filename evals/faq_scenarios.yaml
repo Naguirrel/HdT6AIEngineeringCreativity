@@ -122,7 +122,7 @@
   vars:
     scenario: faq_out_of_domain
     turns: ["¿Quién ganó el mundial de ajedrez de 1972?"]
-    forbid_tools: [check_jump_day, check_appointment_availability, create_appointment]
+    forbid_tools: [search_faq, check_jump_day, check_appointment_availability, create_appointment]
   assert:
     - type: regex
       value: '(paracaidismo|evento|informaci[oó]n|ayudar)'

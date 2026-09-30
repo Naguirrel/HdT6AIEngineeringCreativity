@@ -26,6 +26,19 @@ def test_centralized_supervisor_exposes_three_specialists_as_tools():
     assert context.services.faq_service.entries
 
 
+def test_centralized_supervisor_instructions_enforce_domain_boundary():
+    supervisor, _context = build_supervisor()
+    instructions = " ".join(supervisor.instructions.casefold().split())
+    assert "fuera de ese dominio" in instructions
+    assert "no respondas con conocimiento general" in instructions
+    assert "solo puedes ayudar con parachute s.a., sus faqs o citas" in instructions
+    assert "saludos, despedidas y preguntas claramente fuera del dominio" in instructions
+    assert "no invoques faq_specialist, weather_specialist ni scheduling_specialist" in instructions
+    assert {tool.name for tool in supervisor.tools} == {
+        "faq_specialist", "weather_specialist", "scheduling_specialist"
+    }
+
+
 def test_hierarchical_root_manager_has_two_levels():
     root_manager, _context = build_root_manager()
     root_tool_names = {tool.name for tool in root_manager.tools}
