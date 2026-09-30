@@ -71,7 +71,7 @@
     min_retrieved_context: 1
   assert:
     - type: regex
-      value: '(ropa c[oó]moda|ropa deportiva|tenis)'
+      value: '\b(?:[Rr][Oo][Pp][Aa][\s*_]+[Cc][oOóÓ][Mm][oOóÓ][Dd][Aa]|[Rr][Oo][Pp][Aa][\s*_]+[Dd][Ee][Pp][Oo][Rr][Tt][Ii][Vv][Aa]|[Tt][Ee][Nn][Ii][Ss])\b'
     - type: python
       value: file://assertions/tool_trace.py
     - type: factuality
