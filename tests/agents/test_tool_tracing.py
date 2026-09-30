@@ -31,6 +31,8 @@ def test_trace_records_order_arguments_and_results(build_context):
     assert trace[1]["result"] == {"available": True}
     assert trace[2]["arguments"]["customer_name_provided"] is True
     assert trace[2]["arguments"]["contact_provided"] is True
+    assert trace[2]["arguments"]["customer_name_sha256"] == hashlib.sha256(b"Ana Lopez").hexdigest()
+    assert trace[2]["arguments"]["contact_sha256"] == hashlib.sha256(b"ana@example.com").hexdigest()
     assert trace[2]["result"]["created"] is True
     assert "Ana Lopez" not in json.dumps(trace)
     assert "ana@example.com" not in json.dumps(trace)

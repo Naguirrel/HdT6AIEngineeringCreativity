@@ -18,6 +18,7 @@ class EvaluationResult:
     retrieved_context: list[dict[str, str]]
     latency_ms: int
     weather_requests: list[str] | None = None
+    confirmed_tandem_date: str | None = None
 
 
 async def run_centralized_session_async(
@@ -58,6 +59,8 @@ async def run_centralized_session_async(
         latency_ms=round((perf_counter() - started) * 1000),
         weather_requests=[value.isoformat() for value in weather_service.client.calls]
         if weather_service is not None else None,
+        confirmed_tandem_date=context.confirmed_tandem_date.isoformat()
+        if context.confirmed_tandem_date is not None else None,
     )
 
 

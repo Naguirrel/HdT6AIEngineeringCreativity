@@ -45,6 +45,7 @@ def call_api(prompt, options, context):
             "weather_fixture": weather_fixture,
             "weather_requests": result.weather_requests,
             "real_open_meteo_contacted": False,
+            "confirmed_tandem_date": result.confirmed_tandem_date,
         },
         "latencyMs": result.latency_ms,
     }

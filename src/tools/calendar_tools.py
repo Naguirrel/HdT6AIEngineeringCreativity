@@ -6,6 +6,7 @@ conectan al contexto de la conversacion.
 """
 
 from datetime import datetime
+import hashlib
 import re
 
 from agents import RunContextWrapper, function_tool
@@ -51,6 +52,10 @@ def book_appointment(
         "date_str": _safe_date_argument(date_str),
         "customer_name_provided": isinstance(customer_name, str) and bool(customer_name.strip()),
         "contact_provided": isinstance(contact, str) and bool(contact.strip()),
+        "customer_name_sha256": hashlib.sha256(customer_name.strip().encode("utf-8")).hexdigest()
+        if isinstance(customer_name, str) else None,
+        "contact_sha256": hashlib.sha256(contact.strip().encode("utf-8")).hexdigest()
+        if isinstance(contact, str) else None,
         "is_experienced_tandem": is_experienced_tandem if type(is_experienced_tandem) is bool else None,
         "party_size": party_size if type(party_size) is int else None,
     }

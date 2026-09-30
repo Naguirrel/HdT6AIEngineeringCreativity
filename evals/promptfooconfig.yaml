@@ -6,3 +6,4 @@ providers:
     label: Central Supervisor
 tests:
   - file://faq_scenarios.yaml
+  - file://appointment_scenarios.yaml
