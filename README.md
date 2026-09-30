@@ -306,6 +306,17 @@ consulta Open-Meteo real. El calendario tambien es simulado en memoria.
   los resultados deterministas de la politica meteorologica. Es una
   calificacion de modelo y puede variar; no sustituye las verificaciones
   deterministas ni garantiza que se haya llamado una herramienta.
+  Se aplica solo a cuatro casos de los 32, frente a 11 antes de reducir
+  llamadas al grader:
+  - `faq_place_date`: coherencia semantica de lugar, fecha y hora del evento.
+  - `faq_minor`: condicion de acompanamiento y carta para menores.
+  - `appointment_marginal_unconfirmed`: condicion de tandem experimentado
+    sin confirmacion del usuario.
+  - `appointment_prohibited_wind`: prohibicion de reservar por viento inseguro.
+  En los otros casos, hechos exactos como peso, telefono, ropa y fecha se
+  comprueban con `contains` o `regex`, junto con la traza de herramientas.
+  El grader requiere cuota del proveedor aun con concurrencia uno; menos
+  llamadas reducen ese riesgo, pero no garantizan una evaluacion sin errores.
 - `latency` usa 60 000 ms para FAQ y 180 000 ms para citas. El provider mide
   desde la construccion del supervisor hasta la ultima respuesta, incluidos
   todos los turnos y herramientas; el evaluador de factualidad se ejecuta

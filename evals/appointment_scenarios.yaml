@@ -16,7 +16,6 @@
   assert:
     - {type: contains, value: '2026-09-20'}
     - {type: python, value: 'file://assertions/tool_trace.py'}
-    - {type: factuality, value: 'Para el 20 de septiembre de 2026, el fixture ideal permite una cita de salto para dos personas.'}
 - description: Solicitud de cita sin fecha
   vars:
     scenario: appointment_missing_date
@@ -246,4 +245,3 @@
   assert:
     - {type: contains, value: 'www.parachutesa.gt'}
     - {type: python, value: 'file://assertions/tool_trace.py'}
-    - {type: factuality, value: 'El corpus indica que se puede reservar en www.parachutesa.gt o por WhatsApp al +502 2300-0000.'}

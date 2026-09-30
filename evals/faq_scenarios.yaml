@@ -27,8 +27,6 @@
       value: '100\s*kg'
     - type: python
       value: file://assertions/tool_trace.py
-    - type: factuality
-      value: 'El límite de peso máximo es de 100 kg (220 lbs).'
     - {type: latency, threshold: 60000}
 - description: FAQ cámaras personales GoPro
   vars:
@@ -42,8 +40,6 @@
       value: '[Nn]o.{0,35}(permite|puede|permitido).{0,45}(c[aá]mara|GoPro|Go-Pro)'
     - type: python
       value: file://assertions/tool_trace.py
-    - type: factuality
-      value: 'No se permite llevar cámaras ni celulares personales durante el salto.'
     - {type: latency, threshold: 60000}
 - description: FAQ requisito para participante de 17 años
   vars:
@@ -71,11 +67,11 @@
     min_retrieved_context: 1
   assert:
     - type: regex
-      value: '\b(?:[Rr][Oo][Pp][Aa][\s*_]+[Cc][oOóÓ][Mm][oOóÓ][Dd][Aa]|[Rr][Oo][Pp][Aa][\s*_]+[Dd][Ee][Pp][Oo][Rr][Tt][Ii][Vv][Aa]|[Tt][Ee][Nn][Ii][Ss])\b'
+      value: '\b(?:[Rr][Oo][Pp][Aa][\s*_]+[Cc][oOóÓ][Mm][oOóÓ][Dd][Aa]|[Rr][Oo][Pp][Aa][\s*_]+[Dd][Ee][Pp][Oo][Rr][Tt][Ii][Vv][Aa])\b'
+    - type: regex
+      value: '\b[Tt][Ee][Nn][Ii][Ss]\b'
     - type: python
       value: file://assertions/tool_trace.py
-    - type: factuality
-      value: 'Se recomienda ropa cómoda y deportiva y tenis con cintas bien sujetas; se deben evitar sandalias, tacones y botas pesadas.'
     - {type: latency, threshold: 60000}
 - description: FAQ contacto oficial
   vars:
@@ -85,12 +81,10 @@
     forbid_tools: [check_jump_day, create_appointment]
     min_retrieved_context: 1
   assert:
-    - type: contains
-      value: '+502 2300-0000'
+    - type: regex
+      value: '\+502\s*2300\s*[-‐‑‒–—]\s*0000'
     - type: python
       value: file://assertions/tool_trace.py
-    - type: factuality
-      value: 'El WhatsApp o teléfono oficial es +502 2300-0000.'
     - {type: latency, threshold: 60000}
 - description: FAQ precio ausente del corpus
   vars:
@@ -160,9 +154,9 @@
     min_retrieved_context: 1
   assert:
     - type: regex
-      value: '(tenis|deportiv|c[oó]moda)'
+      value: '\b(?:[Rr][Oo][Pp][Aa][\s*_]+[Cc][oOóÓ][Mm][oOóÓ][Dd][Aa]|[Rr][Oo][Pp][Aa][\s*_]+[Dd][Ee][Pp][Oo][Rr][Tt][Ii][Vv][Aa])\b'
+    - type: regex
+      value: '\b[Tt][Ee][Nn][Ii][Ss]\b'
     - type: python
       value: file://assertions/tool_trace.py
-    - type: factuality
-      value: 'Se recomienda usar ropa cómoda y deportiva y tenis con cintas bien sujetas.'
     - {type: latency, threshold: 60000}
