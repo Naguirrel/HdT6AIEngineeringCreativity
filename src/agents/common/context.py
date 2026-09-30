@@ -37,6 +37,7 @@ class ParachuteContext:
     appointment_data: AppointmentData | None = None
     appointment_record: AppointmentRecord | None = None
     confirmed_tandem_date: date | None = None
+    retrieved_context: list[dict[str, str]] = field(default_factory=list)
     _tool_trace: list[dict] = field(default_factory=list, repr=False)
 
     def record_tool_event(self, tool: str, arguments: dict, result: dict, status: str) -> None:
@@ -53,6 +54,9 @@ class ParachuteContext:
     def get_tool_trace(self) -> list[dict]:
         """Return a copy so callers cannot alter the session's recorded events."""
         return deepcopy(self._tool_trace)
+
+    def get_retrieved_context(self) -> list[dict[str, str]]:
+        return deepcopy(self.retrieved_context)
 
     def observe_user_message(self, message: str) -> None:
         """Record an explicit user confirmation for the currently assessed marginal day."""
