@@ -127,8 +127,8 @@ Cada `ParachuteContext` conserva una traza estructurada de las cuatro tools de
 negocio (`search_faq`, `check_jump_day`, `check_appointment_availability`,
 `create_appointment`). `context.get_tool_trace()` devuelve eventos ordenados con
 `sequence`, `tool`, `arguments`, `result` y `status`. Las consultas FAQ se
-representan por longitud y SHA-256; nombre y contacto se reducen a indicadores
-de presencia. La traza pertenece al contexto de la sesion y no contiene los
+representan por longitud y SHA-256; nombre y contacto se representan por
+indicadores de presencia y SHA-256. La traza pertenece al contexto de la sesion y no contiene los
 valores de credenciales ni datos de contacto completos. Las delegaciones
 `as_tool()` y los handoffs del SDK no se incluyen en esta traza de negocio;
 su instrumentacion requiere observar eventos del Runner en una capa separada.
@@ -179,3 +179,118 @@ servicios/integraciones compartidos.
 (exportado) responden las dos preguntas obligatorias —que arquitectura
 resuelve mejor el problema y si hace falta un sistema multiagente— con
 evidencia real de la suite de tests y de `docs/smoke-test-output.txt`.
+
+## Evaluaciones con Promptfoo
+
+La hoja de evaluaciones prueba el supervisor **centralizado** porque recibe
+todas las solicitudes y delega las consultas FAQ, clima y calendario mediante
+`as_tool()`. El provider de Python en `evals/provider.py` construye ese
+supervisor real en cada caso mediante `src/agents/centralized/evaluation.py`.
+Cada caso obtiene contexto, historial, calendario y traza nuevos. `turns`
+admite un mensaje o una lista para sesiones de varios turnos. La salida de
+Promptfoo es solo la respuesta final; `metadata` contiene eventos de las
+herramientas, contexto FAQ recuperado, fecha de confirmacion tandem y
+duracion total. Las delegaciones `as_tool()` no aparecen en la traza de
+herramientas de negocio.
+
+### Requisitos e instalacion
+
+- Python 3.12 con las dependencias de `requirements.txt`.
+- Node.js 22.22.0 o superior; Node 24 LTS recomendado.
+- Las variables `LLM_API_KEY`, `LLM_BASE_URL` y `LLM_MODEL` para ejecutar el
+  agente y el evaluador. `FAQ_PATH` es opcional. No se versionan valores.
+- `PROMPTFOO_PYTHON` selecciona el Python del entorno virtual. En equipos con
+  directorio de usuario restringido, `PROMPTFOO_CONFIG_DIR` puede señalar un
+  directorio local ignorado por Git. `PROMPTFOO_DISABLE_TELEMETRY=1` desactiva
+  la telemetria opcional.
+
+En PowerShell, desde la raiz del repositorio:
+
+```powershell
+py -3.12 -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+npm ci
+$env:PROMPTFOO_PYTHON = (Resolve-Path .venv\Scripts\python.exe).Path
+$env:PROMPTFOO_CONFIG_DIR = Join-Path (Resolve-Path .venv).Path 'promptfoo-state'
+$env:TEMP = Join-Path (Resolve-Path .venv).Path 'tmp'
+$env:TMP = $env:TEMP
+New-Item -ItemType Directory -Force $env:TEMP | Out-Null
+.\.venv\Scripts\python.exe -m pytest -q -p no:cacheprovider
+npm run eval:validate
+```
+
+Configura las tres variables `LLM_*` mediante un gestor de secretos o un archivo
+`.env` local ignorado por Git. Promptfoo admite `--env-file .env` al ejecutar
+los scripts; el archivo debe contener los valores reales en el equipo del
+operador. El modelo evaluado usa el SDK de OpenAI Agents y `LLM_*`. El
+evaluador de `factuality` es otro provider Promptfoo, declarado por separado
+como `openai:chat:{{ env.LLM_MODEL }}` con `apiBaseUrl` desde `LLM_BASE_URL` y
+`apiKeyEnvar: LLM_API_KEY`. Ambos pueden apuntar al mismo servicio, pero sus
+llamadas y resultados son distintos. El evaluador añade llamadas y puede
+aumentar costo y tiempo. Debe ser un modelo compatible con Chat Completions y
+capaz de responder al prompt de calificacion de Promptfoo.
+
+### Ejecucion y reportes
+
+```powershell
+npm run eval -- --filter-first-n 3 --env-file .env
+npm run eval -- --env-file .env
+npm run eval:report -- --env-file .env
+npm run eval:view
+```
+
+`eval:report` exporta `reports/promptfoo-report.html` y
+`reports/promptfoo-results.json`. Estos archivos se versionan solo tras una
+ejecucion completa real y una revision de datos sensibles y resultados
+fallidos. `--no-cache` evita reutilizar respuestas anteriores. El visor lee
+las evaluaciones locales de Promptfoo. Sin credenciales, `pytest` y
+`eval:validate` siguen disponibles, pero la evaluacion real y su reporte no.
+
+### Casos, datos y metricas
+
+Hay **32 casos**: 12 FAQ (hechos del evento, restricciones, contacto,
+informacion ausente, saludo y despedida) y 20 citas (datos incompletos,
+fronteras de fecha y clima, confirmacion marginal, errores, cambio de fecha,
+intento de omitir clima y orden de herramientas). El reloj se fija por defecto
+en `2026-09-17`; la fecha valida de referencia es `2026-09-20`, la ultima
+`2026-10-02` y la primera fuera de horizonte `2026-10-03`.
+
+Los perfiles de `evals/fixtures/weather.json` tienen ideal 10/15/0/10/25,
+viento marginal 20 y 28 km/h, viento prohibido 28.1, rafagas prohibidas 35.1,
+lluvia 0.1, nubes marginales 75, nubes prohibidas 75.1 y un error controlado.
+Cada caso crea un cliente falso nuevo. El provider sustituye el servicio
+meteorologico antes de procesar mensajes; ninguna prueba deterministica
+consulta Open-Meteo real. El calendario tambien es simulado en memoria.
+
+- `contains` y `regex` revisan hechos concretos de la respuesta; la
+  assertion `python` comprueba metadatos y falla si faltan. Verifica
+  herramientas presentes o ausentes, recuento, orden exacto, fecha,
+  `party_size`, estado y resultado. Compara SHA-256 de nombre y contacto
+  ficticios para confirmar los argumentos sin exponerlos en la traza.
+- `factuality` compara la respuesta con referencias del corpus FAQ o con
+  los resultados deterministas de la politica meteorologica. Es una
+  calificacion de modelo y puede variar; no sustituye las verificaciones
+  deterministas ni garantiza que se haya llamado una herramienta.
+- `latency` usa 60 000 ms para FAQ y 180 000 ms para citas. El provider mide
+  desde la construccion del supervisor hasta la ultima respuesta, incluidos
+  todos los turnos y herramientas; el evaluador de factualidad se ejecuta
+  despues y no forma parte de ese tiempo. Estos limites permiten varias
+  llamadas del agente y distinguen consultas simples del flujo orquestado.
+
+| Requisito | Archivos |
+|-----------|----------|
+| Supervisor centralizado y sesiones aisladas | `src/agents/centralized/evaluation.py`, `evals/provider.py` |
+| FAQs y contexto recuperado | `evals/faq_scenarios.yaml`, `src/tools/faq_tools.py`, `src/agents/common/context.py` |
+| Citas y herramientas | `evals/appointment_scenarios.yaml`, `evals/assertions/tool_trace.py`, `src/tools/calendar_tools.py` |
+| Clima y reloj deterministas | `evals/fixtures/weather.py`, `evals/fixtures/weather.json` |
+| Factuality y latencia | `evals/promptfooconfig.yaml`, archivos de casos |
+| Instalacion y reproduccion | `package.json`, `package-lock.json`, este README |
+| Reporte real | `reports/` despues de ejecutar `npm run eval:report` |
+
+Las respuestas del modelo pueden variar entre ejecuciones y algunos casos
+pueden fallar si el supervisor omite una herramienta obligatoria. Conservar
+esos fallos permite auditar el comportamiento. El corpus FAQ usa busqueda
+lexica; una reformulacion puede no recuperar la entrada deseada. Los casos
+solo instrumentan herramientas de negocio, no las delegaciones internas del
+SDK. No se debe interpretar un `eval:validate` exitoso como aprobacion de
+las 32 evaluaciones: requiere las credenciales y una corrida completa.
