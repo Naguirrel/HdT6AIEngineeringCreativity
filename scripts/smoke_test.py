@@ -32,6 +32,7 @@ async def run_architecture(name: str, starting_agent, context) -> list[str]:
     current_agent = starting_agent
     history: list[dict] = []
     for turn in SCRIPT:
+        context.observe_user_message(turn)
         history.append({"role": "user", "content": turn})
         lines.append(f"Usuario: {turn}")
         try:

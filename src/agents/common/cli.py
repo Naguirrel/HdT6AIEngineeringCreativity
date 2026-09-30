@@ -29,6 +29,7 @@ async def run_chat_async(starting_agent: Agent, context: ParachuteContext, archi
         if not clean_question:
             continue
 
+        context.observe_user_message(clean_question)
         history.append({"role": "user", "content": clean_question})
         log_event(architecture=architecture_name, agent=current_agent.name)
         try:

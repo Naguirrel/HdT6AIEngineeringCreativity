@@ -11,6 +11,7 @@ from src.services.faq_service import FaqService
 from src.services.weather_service import WeatherService
 
 FAQ_PATH = Path(__file__).resolve().parent.parent.parent / "data" / "FAQs_Parachute_SA_Guatemala_2026.txt"
+FIXED_TODAY = date(2026, 9, 17)
 
 
 @dataclass
@@ -46,6 +47,6 @@ def build_context():
             calendar_service=InMemoryCalendarService(),
             faq_service=FaqService.from_path(FAQ_PATH),
         )
-        return ParachuteContext(services=services)
+        return ParachuteContext(services=services, today=lambda: FIXED_TODAY)
 
     return _build

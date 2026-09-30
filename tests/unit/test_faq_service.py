@@ -66,3 +66,30 @@ def test_search_faq_respects_max_results():
     service = FaqService.from_path(FAQ_PATH)
     results = service.search_faq("salto", max_results=2)
     assert len(results) <= 2
+
+
+@pytest.mark.parametrize(
+    "query,expected_fragment",
+    [
+        ("¿Cuál es el teléfono?", "+502 2300-0000"),
+        ("¿Cuál es el peso máximo?", "100 kg"),
+        ("¿Puede saltar una persona de 17 años con sus padres?", "16 y 17 años"),
+        ("¿Qué me pongo para saltar?", "ropa cómoda"),
+    ],
+)
+def test_search_faq_retrieves_specific_or_rephrased_information(query, expected_fragment):
+    service = FaqService.from_path(FAQ_PATH)
+    assert any(expected_fragment in entry.answer for entry in service.search_faq(query))
+
+
+@pytest.mark.parametrize(
+    "query",
+    [
+        "¿Cuánto cuesta el salto?",
+        "¿Hay seguro médico?",
+        "¿Qué sabes de astronomía?",
+        "para el salto de la persona",
+    ],
+)
+def test_search_faq_abstains_without_relevant_information(query):
+    assert FaqService.from_path(FAQ_PATH).search_faq(query) == []

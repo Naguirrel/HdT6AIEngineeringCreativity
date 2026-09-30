@@ -6,6 +6,7 @@ al contexto de la conversacion.
 """
 
 from datetime import date, datetime
+import re
 
 from agents import RunContextWrapper, function_tool
 
@@ -41,17 +42,28 @@ def _format_assessment(assessment) -> str:
 
 def evaluate_jump_day(context: ParachuteContext, date_str: str) -> str:
     """Logica del tool check_jump_day, invocable directamente en tests."""
-    log_event(architecture=context.architecture, tool="check_jump_day", requested_date=date_str)
+    # A failed new request must not leave an earlier day eligible for booking.
+    context.requested_date = None
+    context.jump_assessment = None
+    context.appointment_data = None
+    context.appointment_record = None
+    context.confirmed_tandem_date = None
+    trace_args = {
+        "date_str": date_str if isinstance(date_str, str) and re.fullmatch(r"\d{4}-\d{2}-\d{2}", date_str) else None
+    }
+    log_event(architecture=context.architecture, tool="check_jump_day", requested_date=trace_args["date_str"])
 
     try:
         parsed_date = _parse_date(date_str)
-    except ValueError:
+    except (AttributeError, ValueError):
+        context.record_tool_event("check_jump_day", trace_args, {"error": "invalid_date_format"}, "error")
         return f"Formato de fecha invalido: '{date_str}'. Usa YYYY-MM-DD."
 
     try:
-        assessment = context.services.weather_service.check_jump_day(parsed_date, date.today())
+        assessment = context.services.weather_service.check_jump_day(parsed_date, context.today())
     except WeatherServiceError as error:
         log_event(architecture=context.architecture, tool="check_jump_day", weather_check_result="error")
+        context.record_tool_event("check_jump_day", trace_args, {"error": "weather_check_failed"}, "error")
         return f"Error: {error}"
 
     context.requested_date = parsed_date
@@ -61,6 +73,10 @@ def evaluate_jump_day(context: ParachuteContext, date_str: str) -> str:
         tool="check_jump_day",
         weather_check_result="ok",
         jump_assessment=assessment.decision.value,
+    )
+    context.record_tool_event(
+        "check_jump_day", trace_args,
+        {"decision": assessment.decision.value, "date": parsed_date.isoformat()}, "success",
     )
     return _format_assessment(assessment)
 
