@@ -35,7 +35,7 @@ docker compose build
 | `LLM_API_KEY`  | si        | API key del proveedor compatible con OpenAI (Groq, OpenAI, etc.)     |
 | `LLM_BASE_URL` | si        | URL base de la API, p.ej. `https://api.groq.com/openai/v1`          |
 | `LLM_MODEL`    | si        | Id del modelo, p.ej. `openai/gpt-oss-20b`                            |
-| `LLM_GRADER_MODEL` | para evals | Modelo de `factuality`; en Groq, p.ej. `llama-3.1-8b-instant` |
+| `LLM_GRADER_MODEL` | para evals | Modelo de `factuality`; en Groq, p.ej. `qwen/qwen3.8-27b` |
 | `FAQ_PATH`     | no        | Ruta alterna al archivo de FAQs (por defecto `data/FAQs_...txt`)     |
 
 Open-Meteo no requiere credenciales, por lo que no tiene variable de entorno.
@@ -242,7 +242,7 @@ operador. El modelo evaluado usa el SDK de OpenAI Agents y `LLM_*`. El
 evaluador de `factuality` es otro provider Promptfoo, declarado por separado
 como `openai:chat:{{ env.LLM_GRADER_MODEL }}`. Reutiliza `LLM_BASE_URL` y
 `LLM_API_KEY`; no cambia `LLM_MODEL` del agente. Para Groq, el ejemplo de
-`.env.example` usa `llama-3.1-8b-instant` como grader rápido. Se puede poner
+`.env.example` usa `qwen/qwen3.8-27b` como grader verificado en Groq. Se puede poner
 el mismo valor en `LLM_GRADER_MODEL` y `LLM_MODEL`, aunque se recomienda un
 modelo rápido para evitar demoras en la calificación. Debe ser compatible con
 Chat Completions y responder al prompt de `factuality` de Promptfoo.
@@ -250,19 +250,21 @@ Chat Completions y responder al prompt de `factuality` de Promptfoo.
 Promptfoo 0.123.1 aplica `REQUEST_TIMEOUT_MS: 45000` desde `env` en
 `evals/promptfooconfig.yaml` a cada solicitud HTTP del grader (45 segundos).
 El grader tiene `maxRetries: 0`, por lo que un timeout se registra como fallo
-en lugar de repetir una llamada bloqueada. Este límite no acorta las llamadas
-del agente Python: usa su propio cliente del SDK. Las assertions de
-`factuality` siguen activas.
+en lugar de repetir una llamada bloqueada. El provider Python tiene
+`config.timeout: 180000` (tres minutos) y ese valor prevalece sobre el límite
+global para su worker. Sin ese override, la ejecución
+`eval-ak7-2026-09-30T20:19:50` produjo `Python worker timed out after 45000ms`.
+Las assertions de `factuality` siguen activas.
 
 ### Validación, ejecución y reportes
 
 ```powershell
 python -m pytest -q -p no:cacheprovider
 npm run eval:validate
-npm run eval -- --filter-first-n 3 --env-file .env
-npm run eval -- --filter-first-n 12 --env-file .env
-npm run eval -- --env-file .env
-npm run eval:report -- --env-file .env
+npm run eval -- --filter-first-n 3 --max-concurrency 1 --env-file .env
+npm run eval -- --filter-first-n 12 --max-concurrency 1 --env-file .env
+npm run eval -- --max-concurrency 1 --env-file .env
+npm run eval:report -- --max-concurrency 1 --env-file .env
 npm run eval:view
 ```
 
@@ -365,14 +367,14 @@ aparecer en documentación ni reportes.
 
 1. Ejecutar nuevamente `python -m pytest -q -p no:cacheprovider`.
 2. Validar con `npm run eval:validate`.
-3. Ejecutar los 12 FAQ con `npm run eval -- --filter-first-n 12 --env-file .env`.
+3. Ejecutar los 12 FAQ con `npm run eval -- --filter-first-n 12 --max-concurrency 1 --env-file .env`.
 4. Revisar y clasificar cada fallo o error, incluidos los intentos parciales posteriores al 3/3.
 5. Corregir solo assertions frágiles cuando la respuesta sea realmente correcta.
 6. Mantener las assertions exigentes ante errores reales del agente.
 7. Ejecutar los casos de citas en grupos pequeños.
 8. Verificar herramientas, argumentos, resultados y orden mediante la metadata.
 9. Ejecutar los 32 casos.
-10. Generar HTML y JSON mediante `npm run eval:report -- --env-file .env`.
+10. Generar HTML y JSON mediante `npm run eval:report -- --max-concurrency 1 --env-file .env`.
 11. Revisar ambos reportes para detectar secretos; conservar los fallos reales.
 12. Crear el commit final del reporte tras una corrida real verificada.
 13. Confirmar que `git status --short` esté vacío.

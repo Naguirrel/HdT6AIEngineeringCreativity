@@ -6,6 +6,8 @@ prompts:
 providers:
   - id: file://provider.py
     label: Central Supervisor
+    config:
+      timeout: 180000
 defaultTest:
   options:
     disableVarExpansion: true

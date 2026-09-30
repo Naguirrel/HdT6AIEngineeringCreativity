@@ -69,10 +69,13 @@ Si apunta a otro intérprete, Promptfoo puede fallar con
 `ModuleNotFoundError: No module named 'agents'`. El agente y el evaluador
 usan `LLM_API_KEY` y `LLM_BASE_URL`. El agente usa `LLM_MODEL`; el grader de
 `factuality` usa `LLM_GRADER_MODEL`. Para Groq, configurar en `.env` local
-`LLM_GRADER_MODEL=llama-3.1-8b-instant` es un ejemplo rápido. Puede igualar
+`LLM_GRADER_MODEL=qwen/qwen3.8-27b` es un ejemplo verificado en Groq. Puede igualar
 `LLM_MODEL` si se desea, pero se recomienda un grader rápido. El YAML fija
 `REQUEST_TIMEOUT_MS: 45000` para las solicitudes HTTP de Promptfoo y
-`maxRetries: 0` para el grader; no quitar la assertion `factuality`.
+`maxRetries: 0` para el grader. El provider Python fija
+`config.timeout: 180000` para su worker y no hereda los 45 segundos. Mantener
+`--max-concurrency 1` al ejecutar las evaluaciones. No quitar la assertion
+`factuality`.
 No imprimir sus valores.
 
 ## Procedimiento para continuar
@@ -81,7 +84,7 @@ Primero repetir pytest y la validación como indica el README. El **primer eval
 pendiente** es:
 
 ```powershell
-npm run eval -- --filter-first-n 12 --env-file .env
+npm run eval -- --filter-first-n 12 --max-concurrency 1 --env-file .env
 ```
 
 Clasificar cada error y fallo sin confundir problemas del provider con fallos
