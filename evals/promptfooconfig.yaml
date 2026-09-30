@@ -1,0 +1,7 @@
+description: Parachute S.A. centralized supervisor evaluations
+prompts:
+  - '{{ turns }}'
+providers:
+  - id: file://provider.py
+    label: Central Supervisor
+tests: file://scenarios.yaml
