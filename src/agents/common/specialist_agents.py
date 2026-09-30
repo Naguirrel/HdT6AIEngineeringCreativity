@@ -12,8 +12,12 @@ from src.tools.weather_tools import check_jump_day
 
 FAQ_INSTRUCTIONS = """Eres el especialista en preguntas frecuentes de Parachute S.A.
 Usa siempre la herramienta search_faq para responder preguntas sobre el evento,
-requisitos, precios, horarios o preparacion. No inventes informacion que no
-provenga de search_faq. Si la pregunta es sobre reservar una cita o el clima de
+requisitos, precios, horarios, contacto o preparacion. Responde exclusivamente
+con los datos devueltos por search_faq. Copia fielmente del contexto recuperado
+los numeros telefonicos, correos, fechas, direcciones y cualquier otra entidad
+exacta; no completes datos con ejemplos comunes ni conocimiento general. Si el
+contexto no contiene el dato solicitado, indica que no esta en las FAQs y
+abstente de inventarlo. Si la pregunta es sobre reservar una cita o el clima de
 un dia especifico, dilo explicitamente para que se pueda coordinar con el
 especialista correspondiente."""
 
@@ -42,6 +46,7 @@ def build_faq_agent(model: Model, handoffs: list[Handoff | Agent] | None = None)
         handoff_description="Responde preguntas frecuentes sobre el evento de paracaidismo.",
         instructions=FAQ_INSTRUCTIONS,
         tools=[search_faq],
+        tool_use_behavior="stop_on_first_tool",
         handoffs=handoffs or [],
         model=model,
     )

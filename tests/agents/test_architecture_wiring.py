@@ -7,6 +7,8 @@ import pytest
 from agents import Agent
 
 from src.agents.centralized.main import build_supervisor
+from src.agents.common.model_client import build_model
+from src.agents.common.specialist_agents import build_faq_agent
 from src.agents.decentralized.main import build_decentralized_agents
 from src.agents.hierarchical.main import build_root_manager
 from src.config import load_config
@@ -34,9 +36,25 @@ def test_centralized_supervisor_instructions_enforce_domain_boundary():
     assert "solo puedes ayudar con parachute s.a., sus faqs o citas" in instructions
     assert "saludos, despedidas y preguntas claramente fuera del dominio" in instructions
     assert "no invoques faq_specialist, weather_specialist ni scheduling_specialist" in instructions
+    assert "delega siempre a faq_specialist antes de responder" in instructions
+    assert "no respondas con memoria propia" in instructions
+    assert "copia fielmente los datos exactos" in instructions
+    assert "si el especialista no encuentra el dato solicitado" in instructions
     assert {tool.name for tool in supervisor.tools} == {
         "faq_specialist", "weather_specialist", "scheduling_specialist"
     }
+
+
+def test_faq_specialist_grounding_contract():
+    faq_agent = build_faq_agent(build_model(load_config()))
+    instructions = " ".join(faq_agent.instructions.casefold().split())
+    assert "usa siempre la herramienta search_faq" in instructions
+    assert "responde exclusivamente con los datos devueltos por search_faq" in instructions
+    assert "numeros telefonicos, correos, fechas, direcciones" in instructions
+    assert "no completes datos con ejemplos comunes ni conocimiento general" in instructions
+    assert "si el contexto no contiene el dato solicitado" in instructions
+    assert faq_agent.tool_use_behavior == "stop_on_first_tool"
+    assert [tool.name for tool in faq_agent.tools] == ["search_faq"]
 
 
 def test_hierarchical_root_manager_has_two_levels():

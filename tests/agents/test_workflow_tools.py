@@ -47,7 +47,15 @@ def test_answer_from_faq_abstains_on_missing_price(build_context):
 
 def test_answer_from_faq_includes_contact_from_informative_section(build_context):
     context = build_context({})
-    assert "+502 2300-0000" in answer_from_faq(context, "¿Cuál es el teléfono?")
+    answer = answer_from_faq(context, "¿Cuál es el teléfono de contacto de Parachute S.A.?")
+    assert "+502 2300-0000" in answer
+    assert context.retrieved_context == [
+        {"question": entry.question, "answer": entry.answer}
+        for entry in context.services.faq_service.search_faq("¿Cuál es el teléfono de contacto de Parachute S.A.?")
+    ]
+    assert answer == "\n\n".join(
+        f"P: {entry['question']}\nR: {entry['answer']}" for entry in context.retrieved_context
+    )
 
 
 def test_evaluate_jump_day_rejects_invalid_format(build_context):
