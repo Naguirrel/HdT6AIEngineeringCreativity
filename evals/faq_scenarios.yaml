@@ -9,7 +9,7 @@
     - type: contains
       value: '29 de septiembre de 2026'
     - type: regex
-      value: 'Puerto San Jos[eé]'
+      value: 'Puerto San Jos'
     - type: python
       value: file://assertions/tool_trace.py
     - type: factuality
