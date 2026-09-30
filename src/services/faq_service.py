@@ -15,7 +15,7 @@ _STOP_WORDS = {
 }
 _QUERY_ALIASES = {
     "pongo": "ropa", "ponerme": "ropa", "vestir": "ropa", "vestirme": "ropa",
-    "vestimenta": "ropa", "gopro": "camaras",
+    "vestirse": "ropa", "vestimenta": "ropa", "gopro": "camaras",
 }
 
 

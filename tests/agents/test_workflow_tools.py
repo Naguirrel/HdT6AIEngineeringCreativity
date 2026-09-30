@@ -38,6 +38,15 @@ def test_answer_from_faq_preserves_minor_conditions_in_context(build_context):
     assert source in answer
 
 
+def test_answer_from_faq_retrieves_clothing_for_vestirse(build_context):
+    context = build_context({})
+    answer = answer_from_faq(context, "vestirse para la actividad aérea")
+    assert "ropa cómoda y deportiva" in answer
+    assert any(
+        "ropa cómoda y deportiva" in entry["answer"] for entry in context.retrieved_context
+    )
+
+
 def test_answer_from_faq_retrieves_camera_policy_for_gopro(build_context):
     for query in ("¿Puedo llevar mi GoPro durante el salto?", "GoPro"):
         context = build_context({})

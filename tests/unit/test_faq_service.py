@@ -94,6 +94,24 @@ def test_search_faq_retrieves_specific_or_rephrased_information(query, expected_
 @pytest.mark.parametrize(
     "query",
     [
+        "¿Cómo debería vestirme para la actividad aérea?",
+        "vestirme",
+        "vestirse para la actividad aérea",
+        "vestir",
+        "vestimenta",
+    ],
+)
+def test_search_faq_retrieves_clothing_for_verb_variants(query):
+    service = FaqService.from_path(FAQ_PATH)
+    assert any(
+        entry.question == "¿Qué ropa debo llevar?" and "ropa cómoda y deportiva" in entry.answer
+        for entry in service.search_faq(query)
+    )
+
+
+@pytest.mark.parametrize(
+    "query",
+    [
         "¿Cuánto cuesta el salto?",
         "¿Hay seguro médico?",
         "¿Qué sabes de astronomía?",
