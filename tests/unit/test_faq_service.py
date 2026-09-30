@@ -48,6 +48,15 @@ def test_search_faq_finds_relevant_entry():
     assert any("edad" in entry.question.lower() for entry in results)
 
 
+def test_search_faq_retains_minor_eligibility_conditions():
+    service = FaqService.from_path(FAQ_PATH)
+    results = service.search_faq("Tengo 17 años, ¿qué necesito para participar?")
+    answer = next(entry.answer for entry in results if "edad mínima" in entry.question)
+    assert "16 y 17 años" in answer
+    assert "acompañados por sus padres o tutores legales" in answer
+    assert "firmando la carta de responsabilidad" in answer
+
+
 def test_search_faq_no_match_returns_empty():
     service = FaqService.from_path(FAQ_PATH)
     results = service.search_faq("xyzzyquantumteleportation")

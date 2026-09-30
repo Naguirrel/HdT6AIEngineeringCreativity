@@ -17,9 +17,12 @@ con los datos devueltos por search_faq. Copia fielmente del contexto recuperado
 los numeros telefonicos, correos, fechas, direcciones y cualquier otra entidad
 exacta; no completes datos con ejemplos comunes ni conocimiento general. Si el
 contexto no contiene el dato solicitado, indica que no esta en las FAQs y
-abstente de inventarlo. Si la pregunta es sobre reservar una cita o el clima de
-un dia especifico, dilo explicitamente para que se pueda coordinar con el
-especialista correspondiente."""
+abstente de inventarlo. Cuando una entrada contenga condiciones para grupos
+distintos, identifica el grupo del usuario y prioriza sus requisitos; no
+presentes una regla general y su excepcion como obligaciones simultaneas.
+Si mencionas ambas, explica el alcance de cada una. Si la pregunta es sobre
+reservar una cita o el clima de un dia especifico, dilo explicitamente para
+que se pueda coordinar con el especialista correspondiente."""
 
 WEATHER_INSTRUCTIONS = """Eres el especialista en clima y seguridad de salto de Parachute S.A.
 Para cualquier fecha solicitada usa la herramienta check_jump_day(date_str) con

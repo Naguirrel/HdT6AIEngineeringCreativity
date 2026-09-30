@@ -25,6 +25,19 @@ def test_answer_from_faq_returns_relevant_content(build_context):
     assert "P:" in answer and "R:" in answer
 
 
+def test_answer_from_faq_preserves_minor_conditions_in_context(build_context):
+    context = build_context({})
+    answer = answer_from_faq(context, "Tengo 17 años, ¿qué necesito para participar?")
+    source = next(
+        entry["answer"] for entry in context.retrieved_context
+        if "edad mínima" in entry["question"]
+    )
+    assert "16 y 17 años" in source
+    assert "padres o tutores legales" in source
+    assert "carta de responsabilidad" in source
+    assert source in answer
+
+
 def test_answer_from_faq_retrieves_camera_policy_for_gopro(build_context):
     for query in ("¿Puedo llevar mi GoPro durante el salto?", "GoPro"):
         context = build_context({})

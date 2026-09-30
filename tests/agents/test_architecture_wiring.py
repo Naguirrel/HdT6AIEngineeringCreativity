@@ -40,6 +40,8 @@ def test_centralized_supervisor_instructions_enforce_domain_boundary():
     assert "no respondas con memoria propia" in instructions
     assert "copia fielmente los datos exactos" in instructions
     assert "si el especialista no encuentra el dato solicitado" in instructions
+    assert "prioriza el grupo indicado por el usuario" in instructions
+    assert "no presentes la regla general como requisito absoluto" in instructions
     assert {tool.name for tool in supervisor.tools} == {
         "faq_specialist", "weather_specialist", "scheduling_specialist"
     }
@@ -53,6 +55,8 @@ def test_faq_specialist_grounding_contract():
     assert "numeros telefonicos, correos, fechas, direcciones" in instructions
     assert "no completes datos con ejemplos comunes ni conocimiento general" in instructions
     assert "si el contexto no contiene el dato solicitado" in instructions
+    assert "identifica el grupo del usuario y prioriza sus requisitos" in instructions
+    assert "no presentes una regla general y su excepcion como obligaciones simultaneas" in instructions
     assert faq_agent.tool_use_behavior == "stop_on_first_tool"
     assert [tool.name for tool in faq_agent.tools] == ["search_faq"]
 
