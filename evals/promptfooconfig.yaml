@@ -6,6 +6,7 @@ providers:
     label: Central Supervisor
 defaultTest:
   options:
+    disableVarExpansion: true
     provider:
       id: 'openai:chat:{{ env.LLM_MODEL }}'
       config:
