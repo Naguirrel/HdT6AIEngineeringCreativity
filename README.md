@@ -306,13 +306,16 @@ consulta Open-Meteo real. El calendario tambien es simulado en memoria.
   los resultados deterministas de la politica meteorologica. Es una
   calificacion de modelo y puede variar; no sustituye las verificaciones
   deterministas ni garantiza que se haya llamado una herramienta.
-  Se aplica solo a cuatro casos de los 32, frente a 11 antes de reducir
+  Se aplica solo a tres casos de los 32, frente a 11 antes de reducir
   llamadas al grader:
   - `faq_place_date`: coherencia semantica de lugar, fecha y hora del evento.
-  - `faq_minor`: condicion de acompanamiento y carta para menores.
   - `appointment_marginal_unconfirmed`: condicion de tandem experimentado
     sin confirmacion del usuario.
   - `appointment_prohibited_wind`: prohibicion de reservar por viento inseguro.
+  En `faq_minor` se retiro `factuality` tras falsos negativos repetidos cuando
+  el corpus incluye una regla general de 18 anos con una excepcion explicita
+  para 16 y 17 anos. Sus assertions deterministas comprueban los 17 anos,
+  acompanamiento por padres o tutores, carta de responsabilidad y traza FAQ.
   En los otros casos, hechos exactos como peso, telefono, ropa y fecha se
   comprueban con `contains` o `regex`, junto con la traza de herramientas.
   El grader requiere cuota del proveedor aun con concurrencia uno; menos

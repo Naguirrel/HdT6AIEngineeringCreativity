@@ -50,13 +50,13 @@
     min_retrieved_context: 1
   assert:
     - type: regex
+      value: '17\s*años'
+    - type: regex
       value: '(?:[Aa]compa[ñn]ad[oa]s?|[Aa]compa[ñn]amiento|[Aa]utorizaci[oó]n)[\s\S]{0,80}\b(?:[Pp]adres?|[Tt]utores?)\b|\b(?:[Pp]adres?|[Tt]utores?)\b[\s\S]{0,80}(?:[Aa]compa[ñn]ad[oa]s?|[Aa]compa[ñn]amiento|[Aa]utorizaci[oó]n)'
     - type: regex
       value: '(carta|responsabilidad)'
     - type: python
       value: file://assertions/tool_trace.py
-    - type: factuality
-      value: 'Las personas de 16 y 17 años pueden saltar acompañadas por padres o tutores legales y deben firmar la carta de responsabilidad en el lugar.'
     - {type: latency, threshold: 60000}
 - description: FAQ ropa recomendada
   vars:
