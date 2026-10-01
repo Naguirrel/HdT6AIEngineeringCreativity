@@ -23,6 +23,7 @@ def _safe_date_argument(value: object) -> str | None:
 
 
 def evaluate_availability(context: ParachuteContext, date_str: str) -> str:
+    context.availability_approved_date = None
     trace_args = {"date_str": _safe_date_argument(date_str)}
     try:
         parsed_date = datetime.strptime(date_str.strip(), "%Y-%m-%d").date()
@@ -36,6 +37,8 @@ def evaluate_availability(context: ParachuteContext, date_str: str) -> str:
         context.record_tool_event("check_appointment_availability", trace_args, {"error": "availability_failed"}, "error")
         return f"No se pudo comprobar disponibilidad: {error}"
     context.record_tool_event("check_appointment_availability", trace_args, {"available": available}, "success")
+    if available:
+        context.availability_approved_date = parsed_date
     return "Hay cupo disponible." if available else f"No hay cupo disponible para {date_str}."
 
 
@@ -92,6 +95,10 @@ def book_appointment(
             "el tandem experimentado para esta fecha."
         )
 
+    if not context.jump_assessment.allows_appointment:
+        context.record_tool_event("create_appointment", trace_args, {"created": False, "error": "weather_prohibited"}, "error")
+        return "No se pudo crear la cita: las condiciones climaticas prohiben el salto."
+
     try:
         data = AppointmentData(
             customer_name=customer_name,
@@ -104,6 +111,12 @@ def book_appointment(
         log_event(architecture=context.architecture, tool="create_appointment", calendar_write_result="invalid_input")
         context.record_tool_event("create_appointment", trace_args, {"created": False, "error": "invalid_input"}, "error")
         return f"No se pudo crear la cita: {error}"
+
+    if context.availability_approved_date != requested_date:
+        context.record_tool_event("create_appointment", trace_args, {"created": False, "error": "availability_not_approved"}, "error")
+        return "No se puede crear la cita: primero debes ejecutar check_appointment_availability para esta fecha y confirmar que hay cupo."
+
+    context.availability_approved_date = None
 
     try:
         record = context.services.calendar_service.create_appointment(data, context.jump_assessment)

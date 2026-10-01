@@ -45,6 +45,7 @@ def evaluate_jump_day(context: ParachuteContext, date_str: str) -> str:
     # A failed new request must not leave an earlier day eligible for booking.
     context.requested_date = None
     context.jump_assessment = None
+    context.availability_approved_date = None
     context.appointment_data = None
     context.appointment_record = None
     context.confirmed_tandem_date = None

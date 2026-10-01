@@ -34,6 +34,7 @@ class ParachuteContext:
     today: Callable[[], date] = field(default=current_guatemala_date, repr=False)
     requested_date: date | None = None
     jump_assessment: JumpAssessment | None = None
+    availability_approved_date: date | None = None
     appointment_data: AppointmentData | None = None
     appointment_record: AppointmentRecord | None = None
     confirmed_tandem_date: date | None = None
