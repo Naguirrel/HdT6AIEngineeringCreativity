@@ -211,3 +211,39 @@ async def test_runner_completes_marginal_booking_when_model_stalls(build_context
         "check_jump_day", "check_appointment_availability", "create_appointment"
     ]
     assert result.confirmed_tandem_date == ISO
+
+
+@pytest.mark.parametrize("text", ["No, la evaluación no es marginal.", "No.", "Lo siento, no se puede reservar ese día."])
+def test_bookable_day_is_not_answered_with_a_refusal(build_context, text):
+    # Regression from eval-Txz (appointment_last_valid): IDEAL + cupo, but the answer was "No, ...".
+    context = build_context({DAY: make_snapshot(DAY)})
+    context.observe_user_message(f"¿Se puede reservar el {ISO} para Ana Ejemplo, ana@example.invalid?")
+    evaluate_jump_day(context, ISO)
+    evaluate_availability(context, ISO)
+    answer = finish_turn(context, text)
+    assert answer.startswith(f"Si, el {ISO} se puede reservar: el clima evaluado es IDEAL.")
+    assert "Hay cupo disponible." in answer
+    assert context.appointment_record is None  # a question alone never books
+
+
+def test_marginal_refusal_becomes_the_tandem_requirement(build_context):
+    context = _marginal_context(build_context)
+    context.observe_user_message(f"Reserva el {ISO} para Ana Ejemplo, ana@example.invalid.")
+    evaluate_jump_day(context, ISO)
+    answer = finish_turn(context, "No se puede reservar una cita individual para esa fecha.")
+    assert "MARGINAL" in answer and "tandem con instructor experimentado" in answer
+    assert f"Acepto tandem experimentado para {ISO}" in answer and "25.0 km/h" in answer
+
+
+@pytest.mark.parametrize("weather", [{"precipitation_mm": 1.0}])
+def test_refusals_stay_when_they_are_true(build_context, weather):
+    context = build_context({DAY: make_snapshot(DAY, **weather)})
+    context.observe_user_message(f"¿Se puede reservar el {ISO}?")
+    evaluate_jump_day(context, ISO)
+    assert finish_turn(context, "No, el clima lo prohíbe.") == "No, el clima lo prohíbe."
+    full = build_context({DAY: make_snapshot(DAY)})
+    full.services.calendar_service.max_slots_per_day = 0
+    full.observe_user_message(f"¿Se puede reservar el {ISO}?")
+    evaluate_jump_day(full, ISO)
+    evaluate_availability(full, ISO)
+    assert finish_turn(full, "No, no hay cupo ese día.") == "No, no hay cupo ese día."

@@ -11,7 +11,7 @@ y, si el clima es MARGINAL, la confirmación tándem explícita del usuario.
 La rama `fix-audit-findings` corrige los 27 hallazgos de la auditoría
 (AUD-001 a AUD-027). Hay **43 casos** Promptfoo (14 FAQ y 29 de citas),
 agrupados por `metadata.phase`: `faq`, `booking`, `marginal` y `prohibited`.
-La suite Python tiene **460 pruebas** y `npm run eval:validate` valida la
+La suite Python tiene **465 pruebas** y `npm run eval:validate` valida la
 configuración. Las corridas Promptfoo históricas se ejecutaron con código
 anterior: ver la tabla del README. Cualquier corrida nueva sobre esta rama se
 registra con su ID y commit exactos.

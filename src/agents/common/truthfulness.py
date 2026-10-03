@@ -69,6 +69,50 @@ def describe_booking_state(context: ParachuteContext) -> str:
     return " ".join(lines)
 
 
+_DENIES_ELIGIBILITY = re.compile(
+    r"^\W*no\s*[,.!:;]|\bno\s+(?:se\s+)?(?:puede|podemos|es\s+posible)\s+(?:reservar|saltar|realizar\s+el\s+salto)\b"
+)
+
+
+def _availability_denied(context: ParachuteContext, target) -> bool:
+    for event in reversed(context.get_tool_trace()):
+        if event["tool"] == "check_appointment_availability" and event["arguments"].get("date_str") == target.isoformat():
+            return event["status"] == "success" and event["result"].get("available") is False
+    return False
+
+
+def describe_eligibility(context: ParachuteContext) -> str:
+    """Deterministic answer to "can I book this date?" from the current assessment."""
+    assessment, target = context.jump_assessment, context.requested_date
+    lines = [f"Si, el {target.isoformat()} se puede reservar: el clima evaluado es {assessment.decision.value}."]
+    if assessment.decision == Decision.MARGINAL:
+        lines.append("Solo se permite salto tandem con instructor experimentado.")
+        lines.extend(assessment.reasons)
+        if context.confirmed_tandem_date != target:
+            lines.append(f"Para continuar escribe: 'Acepto tandem experimentado para {target.isoformat()}'.")
+    if context.availability_approved_date == target:
+        lines.append("Hay cupo disponible.")
+    missing = [field for field in context.booking_request.missing_fields() if field != "fecha"]
+    if missing:
+        lines.append("Para crear la cita necesito: " + ", ".join(missing) + ".")
+    else:
+        lines.append("Si deseas reservar, confirmalo.")
+    return " ".join(lines)
+
+
+def enforce_consistent_eligibility(context: ParachuteContext, text: str) -> str:
+    """A day that was just evaluated as bookable must not be answered with a bare refusal."""
+    assessment, target = context.jump_assessment, context.requested_date
+    if (
+        assessment is None or target is None or not assessment.allows_appointment
+        or "check_jump_day" not in context.turn_tools or _availability_denied(context, target)
+    ):
+        return text
+    if not _DENIES_ELIGIBILITY.search(normalize_text(text.replace("*", ""))):
+        return text
+    return describe_eligibility(context)
+
+
 def enforce_truthful_booking_claims(context: ParachuteContext, text: str) -> str:
     """Drop sentences claiming an appointment that the calendar does not contain."""
     kept: list[str] = []

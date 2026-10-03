@@ -126,7 +126,7 @@ npm run eval:validate
 npm run test:assertions
 ```
 
-La suite tiene **460 pruebas** deterministas (dominio, integraciones con
+La suite tiene **465 pruebas** deterministas (dominio, integraciones con
 Open-Meteo simulado, herramientas, garantías y flujos reales del Agents SDK de
 las tres arquitecturas con un modelo guionizado sin red). Ninguna llama a un LLM
 ni a Internet. `test:assertions` evalúa, con el motor de regex de JavaScript que
