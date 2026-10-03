@@ -113,6 +113,24 @@ def enforce_consistent_eligibility(context: ParachuteContext, text: str) -> str:
     return describe_eligibility(context)
 
 
+def ensure_weather_reasons(context: ParachuteContext, text: str) -> str:
+    """MARGINAL/PROHIBITED answers must state the official reasons (measured values and limits)."""
+    assessment = context.jump_assessment
+    if (
+        assessment is None or assessment.decision == Decision.IDEAL or not assessment.reasons
+        or "check_jump_day" not in context.turn_tools
+    ):
+        return text
+    stated = {float(value.replace(",", ".")) for value in re.findall(r"\d+(?:[.,]\d+)?", normalize_text(text))}
+    missing = [
+        reason for reason in assessment.reasons
+        if not all(float(number) in stated for number in re.findall(r"\d+(?:\.\d+)?", reason)[:1])
+    ]
+    if not missing:
+        return text
+    return f"{text.rstrip()}\n\nMotivo segun la evaluacion meteorologica oficial: " + " ".join(missing)
+
+
 def enforce_truthful_booking_claims(context: ParachuteContext, text: str) -> str:
     """Drop sentences claiming an appointment that the calendar does not contain."""
     kept: list[str] = []

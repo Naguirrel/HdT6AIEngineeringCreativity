@@ -11,7 +11,9 @@ from agents import FunctionToolResult, RunContextWrapper, ToolsToFinalOutputResu
 
 from src.agents.common.context import ParachuteContext
 from src.agents.common.grounding import ground_answer
-from src.agents.common.truthfulness import enforce_consistent_eligibility, enforce_truthful_booking_claims
+from src.agents.common.truthfulness import (
+    enforce_consistent_eligibility, enforce_truthful_booking_claims, ensure_weather_reasons,
+)
 from src.agents.common.user_message import normalize_text
 from src.tools.calendar_tools import book_appointment, evaluate_availability
 from src.tools.faq_tools import answer_from_faq
@@ -115,4 +117,5 @@ def finish_turn(context: ParachuteContext, model_output: object) -> str:
         return compose_booking_answer(context)
     text = model_output if isinstance(model_output, str) else ""
     text = enforce_consistent_eligibility(context, ground_answer(context, text))
+    text = ensure_weather_reasons(context, text)
     return enforce_truthful_booking_claims(context, text)

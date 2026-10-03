@@ -240,10 +240,38 @@ def test_refusals_stay_when_they_are_true(build_context, weather):
     context = build_context({DAY: make_snapshot(DAY, **weather)})
     context.observe_user_message(f"¿Se puede reservar el {ISO}?")
     evaluate_jump_day(context, ISO)
-    assert finish_turn(context, "No, el clima lo prohíbe.") == "No, el clima lo prohíbe."
+    answer = finish_turn(context, "No, el clima lo prohíbe.")
+    assert answer.startswith("No, el clima lo prohíbe.") and "Precipitacion de 1.0 mm" in answer
     full = build_context({DAY: make_snapshot(DAY)})
     full.services.calendar_service.max_slots_per_day = 0
     full.observe_user_message(f"¿Se puede reservar el {ISO}?")
     evaluate_jump_day(full, ISO)
     evaluate_availability(full, ISO)
     assert finish_turn(full, "No, no hay cupo ese día.") == "No, no hay cupo ese día."
+
+
+def test_marginal_answer_without_measured_value_gets_the_official_reason(build_context):
+    # Regression from eval-oq5 (appointment_marginal_unconfirmed): MARGINAL explained without 20 km/h.
+    context = build_context({DAY: make_snapshot(DAY, wind_speed_10m_kmh=20.0)})
+    context.observe_user_message(REQUEST)
+    evaluate_jump_day(context, ISO)
+    text = "El clima es **MARGINAL**: solo tándem con instructor experimentado. Escribe 'Acepto tandem experimentado'."
+    answer = finish_turn(context, text)
+    assert answer.startswith(text)
+    assert "20.0 km/h esta en rango marginal" in answer
+
+
+def test_prohibited_answer_without_threshold_gets_the_official_reason(build_context):
+    context = build_context({DAY: make_snapshot(DAY, wind_speed_10m_kmh=28.1)})
+    context.observe_user_message(REQUEST)
+    evaluate_jump_day(context, ISO)
+    answer = finish_turn(context, "Lo siento, el viento excede el límite permitido; no se puede reservar.")
+    assert "28.1 km/h supera el limite de 28 km/h" in answer
+
+
+def test_reasons_are_not_repeated_when_already_stated(build_context):
+    context = build_context({DAY: make_snapshot(DAY, wind_speed_10m_kmh=20.0)})
+    context.observe_user_message(REQUEST)
+    evaluate_jump_day(context, ISO)
+    text = "Es MARGINAL por viento de 20 km/h; solo tándem con instructor experimentado."
+    assert finish_turn(context, text) == text
