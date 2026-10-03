@@ -138,7 +138,7 @@ def test_create_appointment_requires_approved_availability(build_context):
     assert context.get_tool_trace()[-1]["result"]["error"] == "availability_not_approved"
 
     context.services.calendar_service.max_slots_per_day = 0
-    assert "No hay cupo disponible" in evaluate_availability(context, TOMORROW.isoformat())
+    assert not evaluate_availability(context, TOMORROW.isoformat()).startswith("Hay cupo")
     refused = book_appointment(context, TOMORROW.isoformat(), "Juan Perez", "juan@example.com")
     assert "check_appointment_availability" in refused
     assert context.appointment_record is None

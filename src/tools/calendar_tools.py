@@ -14,12 +14,26 @@ from src.domain.appointment_models import AppointmentData, AppointmentRecord
 from src.domain.dates import normalized_date_or_none, parse_date_argument
 from src.domain.weather_models import Decision
 from src.observability import log_event
-from src.services.calendar_service import CalendarServiceError
+from src.services.calendar_service import CalendarConflictError, CalendarServiceError
 
 
-def evaluate_availability(context: ParachuteContext, date_str: str) -> str:
+def _requested_party_size(context: ParachuteContext, party_size: int | None) -> int | None:
+    if party_size is None:
+        stored = context.booking_request.party_size
+        return stored if stored is not None else 1
+    return party_size
+
+
+def evaluate_availability(context: ParachuteContext, date_str: str, party_size: int | None = None) -> str:
     context.availability_approved_date = None
-    trace_args = {"date_str": normalized_date_or_none(date_str)}
+    party_size = _requested_party_size(context, party_size)
+    trace_args = {
+        "date_str": normalized_date_or_none(date_str),
+        "party_size": party_size if type(party_size) is int else None,
+    }
+    if type(party_size) is not int or party_size < 1:
+        context.record_tool_event("check_appointment_availability", trace_args, {"error": "invalid_party_size"}, "error")
+        return "El numero de participantes debe ser un entero mayor o igual a 1."
     try:
         parsed_date = parse_date_argument(date_str)
     except ValueError as error:
@@ -39,15 +53,20 @@ def evaluate_availability(context: ParachuteContext, date_str: str) -> str:
         )
         return "No se puede aprobar disponibilidad: primero valida el clima y los requisitos para esta fecha."
 
+    calendar = context.services.calendar_service
     try:
-        available = context.services.calendar_service.check_availability(parsed_date)
+        available = calendar.check_availability(parsed_date, party_size)
     except CalendarServiceError as error:
         context.record_tool_event("check_appointment_availability", trace_args, {"error": "availability_failed"}, "error")
         return f"No se pudo comprobar disponibilidad: {error}"
     context.record_tool_event("check_appointment_availability", trace_args, {"available": available}, "success")
     if available:
         context.availability_approved_date = parsed_date
-    return "Hay cupo disponible." if available else f"No hay cupo disponible para {date_str}."
+        return f"Hay cupo disponible para {party_size} participante(s) el {parsed_date.isoformat()}."
+    capacity = getattr(calendar, "max_slots_per_day", None)
+    if capacity is not None and party_size > capacity:
+        return f"El grupo de {party_size} excede la capacidad maxima de {capacity} participantes por dia."
+    return f"No hay cupo disponible para {party_size} participante(s) el {parsed_date.isoformat()}."
 
 
 def format_confirmation(record: AppointmentRecord) -> str:
@@ -138,41 +157,64 @@ def book_appointment(
         context.record_tool_event("create_appointment", trace_args, {"created": False, "error": "invalid_input"}, "error")
         return f"No se pudo crear la cita: {error}"
 
-    if not context.has_current_booking_approvals(requested_date):
+    if not context.has_current_booking_approvals(requested_date, data.party_size):
         context.record_tool_event("create_appointment", trace_args, {"created": False, "error": "availability_not_approved"}, "error")
-        return "No se puede crear la cita: primero debes ejecutar check_appointment_availability para esta fecha y confirmar que hay cupo."
+        return (
+            "No se puede crear la cita: primero debes ejecutar check_appointment_availability para esta "
+            "fecha y este numero de participantes y confirmar que hay cupo."
+        )
 
     context.availability_approved_date = None
 
     try:
-        record = context.services.calendar_service.create_appointment(data, context.jump_assessment)
+        outcome = context.services.calendar_service.create_appointment(data, context.jump_assessment)
+    except CalendarConflictError as error:
+        log_event(architecture=context.architecture, tool="create_appointment", calendar_write_result="conflict")
+        context.record_tool_event(
+            "create_appointment", trace_args, {"created": False, "duplicate": True, "error": "conflict"}, "error"
+        )
+        return f"No se pudo crear la cita: {error}"
     except CalendarServiceError as error:
         log_event(architecture=context.architecture, tool="create_appointment", calendar_write_result="rejected")
         context.record_tool_event("create_appointment", trace_args, {"created": False, "error": "calendar_rejected"}, "error")
         return f"No se pudo crear la cita: {error}"
 
-    context.appointment_data = data
+    record = outcome.record
+    context.appointment_data = record.data
     context.appointment_record = record
-    context.appointments.append(record)
+    if record not in context.appointments:
+        context.appointments.append(record)
     context.remember_booking_details(
-        jump_date=data.jump_date, customer_name=data.customer_name,
-        contact=data.contact, party_size=data.party_size,
+        jump_date=record.data.jump_date, customer_name=record.data.customer_name,
+        contact=record.data.contact, party_size=record.data.party_size,
     )
-    confirmation = format_confirmation(record)
+    if outcome.created:
+        confirmation = format_confirmation(record)
+        result = {"created": True, "date": requested_date.isoformat()}
+    else:
+        confirmation = (
+            f"Ya existia una cita identica (id={record.id}) para {record.data.jump_date.isoformat()}; "
+            "no se creo una nueva."
+        )
+        result = {"created": False, "duplicate": True, "date": requested_date.isoformat()}
     context.appointment_confirmation = confirmation
-    log_event(architecture=context.architecture, tool="create_appointment", calendar_write_result="success")
-    context.record_tool_event("create_appointment", trace_args, {"created": True, "date": requested_date.isoformat()}, "success")
+    log_event(architecture=context.architecture, tool="create_appointment",
+              calendar_write_result="success" if outcome.created else "duplicate")
+    context.record_tool_event("create_appointment", trace_args, result, "success")
     return confirmation
 
 
 @function_tool
-def check_appointment_availability(wrapper: RunContextWrapper[ParachuteContext], date_str: str) -> str:
-    """Verifica si hay cupo disponible para una fecha.
+def check_appointment_availability(
+    wrapper: RunContextWrapper[ParachuteContext], date_str: str, party_size: int | None = None
+) -> str:
+    """Verifica si hay cupo disponible para todo el grupo en una fecha.
 
     Args:
         date_str: fecha a verificar en formato YYYY-MM-DD.
+        party_size: numero de participantes; si se omite se usa el indicado por el usuario.
     """
-    return evaluate_availability(wrapper.context, date_str)
+    return evaluate_availability(wrapper.context, date_str, party_size)
 
 
 @function_tool

@@ -91,8 +91,8 @@ class ParachuteContext:
         self.retrieved_context.extend(deepcopy(entries))
         self.turn_faq_entries.extend(deepcopy(entries))
 
-    def has_current_booking_approvals(self, requested_date: date) -> bool:
-        """Require matching, ordered approvals in this session's business trace."""
+    def has_current_booking_approvals(self, requested_date: date, party_size: int | None = None) -> bool:
+        """Require matching, ordered approvals (same date and group size) in this session's trace."""
         if self.requested_date != requested_date or self.availability_approved_date != requested_date:
             return False
         if (
@@ -119,6 +119,7 @@ class ParachuteContext:
             and weather_event["result"].get("decision") == self.jump_assessment.decision.value
             and availability_event["arguments"].get("date_str") == requested_date.isoformat()
             and availability_event["result"].get("available") is True
+            and (party_size is None or availability_event["arguments"].get("party_size") == party_size)
             and weather_event["sequence"] < availability_event["sequence"]
         )
 

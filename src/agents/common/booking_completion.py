@@ -35,14 +35,14 @@ def complete_pending_booking(context: ParachuteContext) -> str | None:
     if tandem and context.confirmed_tandem_date != target:
         return None
 
-    if not context.has_current_booking_approvals(target):
-        evaluate_availability(context, target.isoformat())
-        if not context.has_current_booking_approvals(target):
-            request.blocked_reason = "no hay cupo aprobado para esa fecha."
+    party_size = request.party_size if request.party_size is not None else 1
+    if not context.has_current_booking_approvals(target, party_size):
+        availability = evaluate_availability(context, target.isoformat(), party_size)
+        if not context.has_current_booking_approvals(target, party_size):
+            request.blocked_reason = availability
             return None
     outcome = book_appointment(
-        context, target.isoformat(), request.customer_name, request.contact, tandem,
-        request.party_size if request.party_size is not None else 1,
+        context, target.isoformat(), request.customer_name, request.contact, tandem, party_size,
     )
     if not context.appointment_confirmation:
         request.blocked_reason = outcome
