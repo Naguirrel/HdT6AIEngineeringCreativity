@@ -6,7 +6,7 @@ name, contact, party size or date between turns and nested agents.
 """
 
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, timedelta
 import re
 import unicodedata
 
@@ -38,15 +38,76 @@ def normalize_text(text: str) -> str:
     return re.sub(r"\s+", " ", _DASHES.sub("-", without_marks))
 
 
-def find_iso_dates(text: str) -> tuple[list[date], bool]:
-    """Return valid ISO dates in the text and whether an invalid ISO-like value appeared."""
+_MONTHS = {
+    "enero": 1, "febrero": 2, "marzo": 3, "abril": 4, "mayo": 5, "junio": 6, "julio": 7,
+    "agosto": 8, "septiembre": 9, "setiembre": 9, "octubre": 10, "noviembre": 11, "diciembre": 12,
+}
+_DMY_DATE = re.compile(r"(?<![\d/\-])(\d{1,2})[/\-](\d{1,2})[/\-](\d{4})(?![\d/\-])")
+_PARTIAL_NUMERIC_DATE = re.compile(r"(?<![\d/\-])\d{1,2}/\d{1,2}(?![\d/\-])")
+_TEXT_DATE = re.compile(
+    r"\b(\d{1,2})\s+(?:de\s+)?(" + "|".join(_MONTHS) + r")\b(?:\s+(?:de|del)?\s*(\d{4})\b)?"
+)
+_WEEKDAYS = re.compile(r"\b(?:lunes|martes|miercoles|jueves|viernes|sabado|domingo|fin de semana)\b")
+
+
+def _safe_date(year: int, month: int, day: int) -> date | None:
+    try:
+        return date(year, month, day)
+    except ValueError:
+        return None
+
+
+def extract_dates(text: str, today: date | None = None) -> tuple[list[date], bool]:
+    """Parse the dates a user wrote and flag anything that cannot be resolved safely.
+
+    Supported: YYYY-MM-DD (any Unicode dash), DD/MM/YYYY, DD-MM-YYYY, "21 de septiembre"
+    and "21 de septiembre de 2026"; "hoy", "mañana" and "pasado mañana" when `today` is known.
+    Impossible dates, day/month without year in numeric form and weekdays are ambiguous.
+    """
+    normalized = normalize_text(text)
     found: list[date] = []
     ambiguous = False
-    for year, month, day in _ISO_DATE.findall(_DASHES.sub("-", text)):
-        try:
-            found.append(date(int(year), int(month), int(day)))
-        except ValueError:
-            ambiguous = True
+
+    def consume(pattern: re.Pattern, source: str, build) -> str:
+        nonlocal ambiguous
+        for match in pattern.finditer(source):
+            value = build(match)
+            if value is None:
+                ambiguous = True
+            else:
+                found.append(value)
+        return pattern.sub(" ", source)
+
+    remaining = consume(
+        _ISO_DATE, normalized, lambda m: _safe_date(int(m.group(1)), int(m.group(2)), int(m.group(3)))
+    )
+    remaining = consume(
+        _DMY_DATE, remaining, lambda m: _safe_date(int(m.group(3)), int(m.group(2)), int(m.group(1)))
+    )
+
+    def textual(match: re.Match) -> date | None:
+        day, month = int(match.group(1)), _MONTHS[match.group(2)]
+        if match.group(3):
+            return _safe_date(int(match.group(3)), month, day)
+        if today is None:
+            return None
+        candidate = _safe_date(today.year, month, day)
+        if candidate is not None and candidate < today:
+            candidate = _safe_date(today.year + 1, month, day)
+        return candidate
+
+    remaining = consume(_TEXT_DATE, remaining, textual)
+    if _PARTIAL_NUMERIC_DATE.search(remaining) or _WEEKDAYS.search(remaining):
+        ambiguous = True
+
+    if today is not None:
+        if re.search(r"\bpasado manana\b", remaining):
+            found.append(today + timedelta(days=2))
+            remaining = re.sub(r"\bpasado manana\b", " ", remaining)
+        if re.search(r"(?<!\bla )(?<!\bpor la )\bmanana\b", remaining):
+            found.append(today + timedelta(days=1))
+        if re.search(r"\bhoy\b", remaining):
+            found.append(today)
     return found, ambiguous
 
 
@@ -60,8 +121,8 @@ class MessageDetails:
     booking_intent: bool = False
 
 
-def extract_booking_details(message: str) -> MessageDetails:
-    dates, ambiguous = find_iso_dates(message)
+def extract_booking_details(message: str, today: date | None = None) -> MessageDetails:
+    dates, ambiguous = extract_dates(message, today)
     normalized = normalize_text(message)
 
     contact = None

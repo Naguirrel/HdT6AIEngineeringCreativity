@@ -159,7 +159,7 @@ class ParachuteContext:
         self.turn_faq_entries = []
         self.last_user_message = message
 
-        details = extract_booking_details(message)
+        details = extract_booking_details(message, self.today())
         single_date = details.dates[0] if len(set(details.dates)) == 1 else None
         self.remember_booking_details(
             jump_date=single_date,

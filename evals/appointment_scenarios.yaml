@@ -113,6 +113,19 @@
     forbid_tools: [create_appointment]
   assert:
     - {type: python, value: 'file://assertions/tool_trace.py'}
+- description: Confirmación marginal con fecha textual distinta
+  vars:
+    scenario: appointment_marginal_textual_wrong_date
+    turns:
+      - "Quiero reservar el 2026-09-20 para Ana Ejemplo, ana@example.invalid."
+      - "Acepto tándem experimentado para el 21 de septiembre."
+    weather_fixture: marginal_wind_lower
+    expect_tools: [check_jump_day]
+    forbid_tools: [create_appointment]
+    forbid_tandem_confirmation: true
+  assert:
+    - {type: not-regex, value: '[Cc]ita\s+(?:confirmada|creada|registrada|reservada)'}
+    - {type: python, value: 'file://assertions/tool_trace.py'}
 - description: Viento mayor a 28 km por hora
   vars:
     scenario: appointment_prohibited_wind

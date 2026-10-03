@@ -3,7 +3,7 @@
 import re
 
 from src.agents.common.context import ParachuteContext
-from src.agents.common.user_message import find_iso_dates, normalize_text
+from src.agents.common.user_message import extract_dates, normalize_text
 from src.domain.weather_models import Decision
 
 _BOOKING_NOUN = r"(?:cita|reserva|reservacion|salto|turno|cupo|lugar)"
@@ -34,7 +34,7 @@ def _claim_matches_records(context: ParachuteContext, sentence: str) -> bool:
     if not context.appointments:
         return False
     recorded = {record.data.jump_date for record in context.appointments}
-    dates, _ambiguous = find_iso_dates(sentence)
+    dates, _ambiguous = extract_dates(sentence, context.today())
     return all(value in recorded for value in dates)
 
 

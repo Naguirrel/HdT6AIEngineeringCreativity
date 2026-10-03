@@ -61,6 +61,8 @@ def get_assert(output: str, context: dict):
     if "expect_confirmed_tandem_date" in variables:
         if metadata.get("confirmed_tandem_date") != variables["expect_confirmed_tandem_date"]:
             return _result(False, "La confirmación tándem no corresponde a la fecha evaluada")
+    if variables.get("forbid_tandem_confirmation") and metadata.get("confirmed_tandem_date") is not None:
+        return _result(False, "Se registró una confirmación tándem que el usuario no dio para esa fecha")
     if "expect_weather_requests" in variables:
         if metadata.get("weather_requests") != variables["expect_weather_requests"]:
             return _result(False, "Consultas meteorológicas simuladas inesperadas")

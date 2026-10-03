@@ -66,6 +66,13 @@ def test_tool_assertion_checks_arguments_results_status_and_hashed_identity():
                                                                   "result": {"created": False}}]))["pass"] is False
 
 
+def test_tool_assertion_rejects_unexpected_tandem_confirmation():
+    context = _context([], forbid_tandem_confirmation=True)
+    assert get_assert("ok", context)["pass"] is True
+    context["metadata"]["confirmed_tandem_date"] = "2026-09-20"
+    assert get_assert("ok", context)["pass"] is False
+
+
 def test_tool_assertion_requires_weather_before_successful_booking():
     create = {"tool": "create_appointment", "status": "success", "arguments": {"date_str": "2026-09-20"}}
     check = {"tool": "check_jump_day", "status": "success", "result": {"date": "2026-09-20"}}
