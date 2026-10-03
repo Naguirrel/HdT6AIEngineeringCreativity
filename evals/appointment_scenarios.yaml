@@ -14,7 +14,7 @@
       - {tool: check_jump_day, arguments: {date_str: '2026-09-20'}, result: {decision: IDEAL}, status: success}
       - {tool: create_appointment, arguments: {date_str: '2026-09-20', party_size: 2}, result: {created: true}, status: success}
   assert:
-    - {type: contains, value: '2026-09-20'}
+    - {type: regex, value: '(?<!\d)2026[-\u2010-\u2015\u2212]09[-\u2010-\u2015\u2212]20(?!\d)'}
     - {type: python, value: 'file://assertions/tool_trace.py'}
 - description: Solicitud de cita sin fecha
   vars:
