@@ -12,7 +12,7 @@ import re
 from typing import Callable
 
 from src.agents.common.user_message import extract_booking_details, normalize_text
-from src.domain.appointment_models import AppointmentRecord
+from src.domain.appointment_models import AppointmentRecord, normalize_contact
 from src.domain.clock import current_guatemala_date
 from src.domain.weather_models import JumpAssessment
 from src.services.calendar_service import CalendarService
@@ -147,9 +147,12 @@ class ParachuteContext:
 
     def booking_already_recorded(self) -> bool:
         request = self.booking_request
+        try:
+            contact = normalize_contact(request.contact)
+        except ValueError:
+            return False
         return any(
-            record.data.jump_date == request.jump_date
-            and normalize_text(record.data.contact) == normalize_text(request.contact or "")
+            record.data.jump_date == request.jump_date and record.data.contact == contact
             for record in self.appointments
         )
 

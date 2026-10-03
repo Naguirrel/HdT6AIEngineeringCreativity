@@ -125,6 +125,6 @@ def test_invalid_appointment_data_is_rejected_without_using_capacity(overrides):
 
 
 def test_appointment_data_accepts_boundary_lengths_and_minimum_party_size():
-    data = make_data(customer_name="A" * 200, contact="c" * 254, party_size=1)
+    data = make_data(customer_name="A" * 200, contact="c" * 240 + "@example.com", party_size=1)
     record = InMemoryCalendarService().create_appointment(data, make_assessment(Decision.IDEAL))
     assert record.data == data

@@ -5,31 +5,26 @@ testeables sin el runtime de agentes; los decoradores @function_tool solo las
 conectan al contexto de la conversacion.
 """
 
-from datetime import datetime
 import hashlib
-import re
 
 from agents import RunContextWrapper, function_tool
 
 from src.agents.common.context import ParachuteContext
 from src.domain.appointment_models import AppointmentData, AppointmentRecord
+from src.domain.dates import normalized_date_or_none, parse_date_argument
 from src.domain.weather_models import Decision
 from src.observability import log_event
 from src.services.calendar_service import CalendarServiceError
 
 
-def _safe_date_argument(value: object) -> str | None:
-    return value if isinstance(value, str) and re.fullmatch(r"\d{4}-\d{2}-\d{2}", value) else None
-
-
 def evaluate_availability(context: ParachuteContext, date_str: str) -> str:
     context.availability_approved_date = None
-    trace_args = {"date_str": _safe_date_argument(date_str)}
+    trace_args = {"date_str": normalized_date_or_none(date_str)}
     try:
-        parsed_date = datetime.strptime(date_str.strip(), "%Y-%m-%d").date()
-    except (AttributeError, ValueError):
+        parsed_date = parse_date_argument(date_str)
+    except ValueError as error:
         context.record_tool_event("check_appointment_availability", trace_args, {"error": "invalid_date_format"}, "error")
-        return f"Formato de fecha invalido: '{date_str}'. Usa YYYY-MM-DD."
+        return f"Fecha invalida: {error}"
 
     assessment = context.jump_assessment
     if (
@@ -83,7 +78,7 @@ def book_appointment(
         party_size = stored.party_size if stored.party_size is not None else 1
     log_event(architecture=context.architecture, tool="create_appointment", calendar_write_attempt=1)
     trace_args = {
-        "date_str": _safe_date_argument(date_str),
+        "date_str": normalized_date_or_none(date_str),
         "customer_name_provided": isinstance(customer_name, str) and bool(customer_name.strip()),
         "contact_provided": isinstance(contact, str) and bool(contact.strip()),
         "customer_name_sha256": hashlib.sha256(customer_name.strip().encode("utf-8")).hexdigest()
@@ -103,10 +98,10 @@ def book_appointment(
         )
 
     try:
-        requested_date = datetime.strptime(date_str.strip(), "%Y-%m-%d").date()
-    except (AttributeError, ValueError):
+        requested_date = parse_date_argument(date_str)
+    except ValueError as error:
         context.record_tool_event("create_appointment", trace_args, {"created": False, "error": "invalid_date_format"}, "error")
-        return f"Formato de fecha invalido: '{date_str}'. Usa YYYY-MM-DD."
+        return f"Fecha invalida: {error}"
 
     assessed_weather = context.jump_assessment.weather
     if (

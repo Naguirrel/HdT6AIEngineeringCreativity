@@ -5,20 +5,13 @@ de instanciar el runtime de agentes; el decorador @function_tool solo la conecta
 al contexto de la conversacion.
 """
 
-from datetime import date, datetime
-import re
-
 from agents import RunContextWrapper, function_tool
 
 from src.agents.common.context import ParachuteContext
+from src.domain.dates import normalized_date_or_none, parse_date_argument
 from src.domain.weather_models import Decision
 from src.observability import log_event
 from src.services.weather_service import WeatherServiceError
-
-
-def _parse_date(date_str: str) -> date:
-    return datetime.strptime(date_str.strip(), "%Y-%m-%d").date()
-
 
 def _format_assessment(assessment) -> str:
     weather = assessment.weather
@@ -53,16 +46,14 @@ def evaluate_jump_day(context: ParachuteContext, date_str: str) -> str:
     context.assessment_checked_on = None
     context.availability_approved_date = None
     context.confirmed_tandem_date = None
-    trace_args = {
-        "date_str": date_str if isinstance(date_str, str) and re.fullmatch(r"\d{4}-\d{2}-\d{2}", date_str) else None
-    }
+    trace_args = {"date_str": normalized_date_or_none(date_str)}
     log_event(architecture=context.architecture, tool="check_jump_day", requested_date=trace_args["date_str"])
 
     try:
-        parsed_date = _parse_date(date_str)
-    except (AttributeError, ValueError):
+        parsed_date = parse_date_argument(date_str)
+    except ValueError as error:
         context.record_tool_event("check_jump_day", trace_args, {"error": "invalid_date_format"}, "error")
-        return f"Formato de fecha invalido: '{date_str}'. Usa YYYY-MM-DD."
+        return f"Fecha invalida: {error}"
 
     try:
         checked_on = context.today()

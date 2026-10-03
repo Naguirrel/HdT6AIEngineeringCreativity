@@ -7,6 +7,8 @@ por lo que probarlas aqui cubre el comportamiento comun a las tres.
 
 from datetime import timedelta
 
+import pytest
+
 from tests.agents.conftest import FIXED_TODAY, make_snapshot
 
 from src.domain.weather_models import Decision
@@ -83,7 +85,7 @@ def test_answer_from_faq_includes_contact_from_informative_section(build_context
 def test_evaluate_jump_day_rejects_invalid_format(build_context):
     context = build_context({})
     result = evaluate_jump_day(context, "29/09/2026")
-    assert "invalido" in result
+    assert "Fecha invalida" in result
     assert context.jump_assessment is None
 
 
@@ -365,7 +367,7 @@ def test_booking_requires_explicit_matching_date(build_context):
 def test_invalid_new_date_clears_previous_assessment(build_context):
     context = build_context({TOMORROW: make_snapshot(TOMORROW)})
     evaluate_jump_day(context, TOMORROW.isoformat())
-    assert "invalido" in evaluate_jump_day(context, "not-a-date")
+    assert "Fecha invalida" in evaluate_jump_day(context, "not-a-date")
     assert context.jump_assessment is None
     assert "No se puede crear" in book_appointment(
         context, TOMORROW.isoformat(), "Juan Perez", "juan@example.com"
@@ -391,6 +393,26 @@ def test_weather_tool_uses_injected_today_at_both_horizon_boundaries(build_conte
     assert "fuera del horizonte" in evaluate_jump_day(
         context, (FIXED_TODAY + timedelta(days=16)).isoformat()
     )
+
+
+@pytest.mark.parametrize("raw", [" 2026-09-18 ", "2026-9-18", "2026‑09‑18"])
+def test_unpadded_or_unicode_dates_flow_through_one_normalized_value(build_context, raw):
+    context = build_context({TOMORROW: make_snapshot(TOMORROW)})
+    assert "IDEAL" in evaluate_jump_day(context, raw)
+    assert "Hay cupo" in evaluate_availability(context, raw)
+    assert book_appointment(context, raw, "Juan Perez", "juan@example.com").startswith("Cita confirmada")
+    assert {event["arguments"]["date_str"] for event in context.get_tool_trace()} == {TOMORROW.isoformat()}
+
+
+@pytest.mark.parametrize(("name", "contact"), [("A", "un dato inválido"), ("Juan Perez", "12"), ("Ana'); DROP", "a@b.co")])
+def test_booking_rejects_invalid_customer_data_in_domain(build_context, name, contact):
+    context = build_context({TOMORROW: make_snapshot(TOMORROW)})
+    evaluate_jump_day(context, TOMORROW.isoformat())
+    evaluate_availability(context, TOMORROW.isoformat())
+    result = book_appointment(context, TOMORROW.isoformat(), name, contact)
+    assert result.startswith("No se pudo crear la cita")
+    assert context.appointment_record is None
+    assert context.get_tool_trace()[-1]["result"] == {"created": False, "error": "invalid_input"}
 
 
 def test_booking_tool_reports_invalid_input_without_using_capacity(build_context):
