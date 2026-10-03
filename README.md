@@ -1,265 +1,230 @@
-# HDT5 — Orquestacion multiagente: Parachute S.A.
+# HDT6 — Evaluación de agentes con Promptfoo: Parachute S.A.
 
-Tres arquitecturas de agentes (centralizada, jerarquica, descentralizada) que
-resuelven el mismo problema de Parachute S.A. — responder FAQs del evento y
-gestionar citas de salto validando el clima con Open-Meteo — reutilizando
-exactamente el mismo nucleo de dominio, integraciones y tools. Lo unico que
-cambia entre las tres es la estrategia de orquestacion de agentes.
+Este repositorio parte del proyecto HDT5 (orquestación multiagente) y lo amplía
+para la hoja HDT6. Contiene tres arquitecturas de agentes (centralizada,
+jerárquica y descentralizada) que resuelven el mismo problema de Parachute S.A.:
+responder FAQs del evento y gestionar citas de salto validando el clima. Las tres
+reutilizan el mismo núcleo de dominio, integraciones, herramientas y garantías;
+solo cambia la estrategia de orquestación. La hoja HDT6 evalúa con Promptfoo la
+arquitectura **centralizada**.
 
-## Demo en video
+`docs/analisis-arquitecturas.md` y su PDF son el entregable histórico de HDT5 y
+se conservan sin cambios.
+
+## Demo en video (HDT5)
 
 [Video demostrativo](https://youtu.be/vHEtqMTmSos) de las tres arquitecturas
-funcionando contra Groq + Open-Meteo reales (FAQ, reserva con clima real,
-fecha fuera de horizonte).
+contra Groq y Open-Meteo reales, grabado en HDT5 antes de las correcciones de
+HDT6.
 
-## Prerequisites
+## Garantías implementadas en código (no solo en prompts)
 
-- Docker y Docker Compose (recomendado, no requiere instalar Python localmente).
-- Alternativamente: Python 3.12 si prefieres correrlo sin Docker.
-- Una API key compatible con la API de OpenAI Chat Completions para el LLM
-  (por ejemplo [Groq](https://console.groq.com/), que ofrece un tier gratuito).
-  El nucleo de dominio y sus tests **no** requieren ninguna API key.
+- **Ninguna cita sin clima y cupo**: `create_appointment` exige una evaluación
+  vigente de `check_jump_day` y una aprobación posterior de
+  `check_appointment_availability` para la misma fecha, el mismo tamaño de
+  grupo, el mismo día local y la misma sesión (estado y traza ordenada).
+- **Respuesta veraz**: `finish_turn` elimina cualquier afirmación de cita
+  confirmada, creada, registrada o reservada sin un registro real y añade el
+  estado verdadero (clima, cupo, confirmación tándem y datos faltantes). Tras una
+  creación real, la respuesta se deriva del registro.
+- **Finalización determinista**: los datos que da el usuario (fecha, nombre,
+  contacto y número de personas) se guardan en el contexto y sobreviven a los
+  turnos y a `as_tool()`. Cuando el clima, la confirmación MARGINAL y los datos
+  están completos, la reserva se completa con las herramientas reales desde
+  `tool_use_behavior` o al cerrar el turno.
+- **Confirmación tándem ligada a fechas**: se reconocen fechas ISO (con guiones
+  Unicode), `DD/MM/YYYY`, `DD-MM-YYYY` y fechas en español. Una fecha distinta o
+  ambigua nunca confirma. Reevaluar el mismo día con resultado MARGINAL conserva
+  la confirmación; un cambio de fecha, de día local o de decisión, o un rechazo
+  explícito, la revoca.
+- **Validación en dominio**: nombre con al menos dos letras y sin caracteres de
+  control ni payloads; contacto como correo válido, teléfono de Guatemala
+  (8 dígitos, `+502` opcional) o E.164; `party_size` entero ≥ 1; fechas
+  normalizadas una sola vez.
+- **Capacidad por participantes** (8 por día, también máximo por reserva),
+  revalidada de forma atómica. Un duplicado idéntico se reporta como
+  `created: false, duplicate: true`; un duplicado con datos distintos es un
+  conflicto.
+- **Grounding determinista**: teléfonos, correos, URL, fechas, horas, números
+  con unidad o moneda y nombres propios de la respuesta deben aparecer en las
+  FAQ recuperadas en el turno, en las salidas de herramientas, en los mensajes
+  del usuario o en la política publicada. Si no, se responde con el texto FAQ
+  literal o con una abstención.
+- **Recuperación FAQ** léxica con normalización, plurales, alias controlados,
+  términos genéricos excluidos y prioridad de la sección de contacto. El corpus
+  no se modificó.
+- **Privacidad**: la traza usa HMAC-SHA256 con una clave efímera por sesión
+  (nunca exportada). La metadata de Promptfoo solo contiene booleanos de
+  identidad. La exportación de trazas del SDK está desactivada. Los errores
+  mostrados al usuario son genéricos.
+- **Datos meteorológicos inválidos** (NaN, infinito, negativos, nubes > 100 %,
+  series vacías, unidades inesperadas) son errores, nunca IDEAL.
 
-## Installation
+## Requisitos
 
-```bash
-cp .env.example .env
-# edita .env con tu LLM_API_KEY / LLM_BASE_URL / LLM_MODEL
-docker compose build
+- Python 3.12 y Node.js 22.22.0 o superior (verificado con Node 24.14.1).
+- Docker y Docker Compose (opcional).
+- Una API key compatible con OpenAI Chat Completions (por ejemplo, Groq) solo
+  para ejecutar los agentes y las evaluaciones; las pruebas no la requieren.
+
+## Variables de entorno
+
+| Variable | Requerida | Descripción |
+|---|---|---|
+| `LLM_API_KEY` | sí (agentes y evals) | API key del proveedor compatible con OpenAI |
+| `LLM_BASE_URL` | sí | URL base, p. ej. `https://api.groq.com/openai/v1` |
+| `LLM_MODEL` | sí | Modelo del agente, p. ej. `openai/gpt-oss-20b` |
+| `LLM_GRADER_MODEL` | para evals | Modelo del grader de `factuality`; el ejemplo es `qwen/qwen3.8-27b`, usado en corridas previas con Groq |
+| `FAQ_PATH` | no | Ruta alterna al archivo de FAQs |
+
+Configúralas en un `.env` local (copia de `.env.example`). **Nunca versiones ni
+compartas `.env` ni claves**: `.env` está ignorado por Git y excluido del
+contexto de Docker (`.dockerignore`). Una prueba automatizada lo verifica. Si
+alguna vez construiste y compartiste una imagen Docker antes de este cambio,
+rota la clave en el proveedor.
+
+## Instalación
+
+### Dependencias reproducibles
+
+`requirements.txt` fija exactamente las dependencias directas.
+`requirements.lock.txt` fija el entorno completo verificado (incluidas las
+transitivas, con marcadores de plataforma).
+
+```powershell
+py -3.12 -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install -r requirements.lock.txt
+npm ci
 ```
 
-## Environment variables
+Con Docker: `docker compose build` (instala `requirements.txt`).
 
-| Variable       | Requerida | Descripcion                                                        |
-|----------------|-----------|---------------------------------------------------------------------|
-| `LLM_API_KEY`  | si        | API key del proveedor compatible con OpenAI (Groq, OpenAI, etc.)     |
-| `LLM_BASE_URL` | si        | URL base de la API, p.ej. `https://api.groq.com/openai/v1`          |
-| `LLM_MODEL`    | si        | Id del modelo, p.ej. `openai/gpt-oss-20b`                            |
-| `LLM_GRADER_MODEL` | para evals | Modelo de `factuality`; en Groq, p.ej. `qwen/qwen3.8-27b` |
-| `FAQ_PATH`     | no        | Ruta alterna al archivo de FAQs (por defecto `data/FAQs_...txt`)     |
+### Preparación de PowerShell para Promptfoo
 
-Open-Meteo no requiere credenciales, por lo que no tiene variable de entorno.
-
-## How to run tests
-
-Los tests de dominio, integraciones y flujos de agentes son deterministas y
-**no** llaman a ningun LLM real ni a Internet (Open-Meteo se mockea con
-`requests-mock`), por lo que corren con variables de entorno ficticias:
-
-```bash
-docker compose --profile test run --rm tests
-```
-
-Sin Docker:
-
-```bash
-pip install -r requirements.txt
-pytest
-```
-
-## How to run each architecture
-
-Cada arquitectura arranca un chat interactivo por terminal (escribe `Bye` o
-`Ctrl-C` para salir). Requieren un `.env` valido con credenciales de LLM reales.
-
-```bash
-# centralizada: un unico supervisor con especialistas expuestos via as_tool()
-docker compose run --rm centralized
-
-# jerarquica: Root Manager -> Knowledge/Booking Manager -> especialistas
-docker compose run --rm hierarchical
-
-# descentralizada: agentes que se transfieren el control via handoffs
-docker compose run --rm decentralized
-```
-
-Sin Docker (con el `.env` cargado en el entorno):
-
-```bash
-python -m src.agents.centralized.main
-python -m src.agents.hierarchical.main
-python -m src.agents.decentralized.main
-```
-
-## Project structure
-
-```
-src/
-  config.py              # coordenadas fijas, horizonte de pronostico, carga de .env
-  domain/                # reglas puras: validacion de fecha y politica de seguridad
-  integrations/          # cliente unico de Open-Meteo (sin reglas de negocio)
-  services/              # WeatherService, CalendarService (in-memory), FaqService
-  tools/                 # tools de agentes: envuelven los servicios, no duplican logica
-  agents/
-    common/               # contexto compartido, cliente de modelo (Groq), CLI
-    centralized/main.py   # arquitectura 1
-    hierarchical/main.py  # arquitectura 2
-    decentralized/main.py # arquitectura 3
-tests/
-  unit/         # dominio y FAQ service (sin red)
-  integration/  # Open-Meteo (mockeado), WeatherService, CalendarService
-  agents/       # tools/flujo de negocio compartido + wiring de las 3 arquitecturas
-data/           # FAQs oficiales de Parachute S.A. (reutilizadas del proyecto Sistema-RAG)
-docs/diagrams/  # diagramas de las tres arquitecturas
-```
-
-## Weather rules
-
-Politica deterministica (no depende del LLM), en `src/domain/weather_policy.py`:
-
-| Variable            | Ideal    | Marginal   | Prohibido |
-|---------------------|----------|------------|-----------|
-| Viento superficie    | < 20 km/h | 20-28 km/h | > 28 km/h |
-| Rafagas              | -        | -          | > 35 km/h |
-| Precipitacion        | 0.0 mm   | -          | > 0.0 mm  |
-| Cobertura de nubes   | < 30%    | 30-75%     | > 75%     |
-
-Se aplica "peor condicion prevalece". `MARGINAL` exige confirmar tandem
-experimentado antes de crear la cita; `PROHIBITED` nunca crea una cita. La
-temperatura se obtiene y se muestra, pero no participa en la decision (el
-enunciado no define un umbral).
-
-El horizonte de pronostico valido es `hoy` hasta `hoy + 15 dias` (16 dias en
-total, segun documenta Open-Meteo).
-
-## Observability
-
-Cada `ParachuteContext` conserva una traza estructurada de las cuatro tools de
-negocio (`search_faq`, `check_jump_day`, `check_appointment_availability`,
-`create_appointment`). `context.get_tool_trace()` devuelve eventos ordenados con
-`sequence`, `tool`, `arguments`, `result` y `status`. Las consultas FAQ se
-representan por longitud y SHA-256; nombre y contacto se representan por
-indicadores de presencia y SHA-256. La traza pertenece al contexto de la sesion y no contiene los
-valores de credenciales ni datos de contacto completos. Las delegaciones
-`as_tool()` y los handoffs del SDK no se incluyen en esta traza de negocio;
-su instrumentacion requiere observar eventos del Runner en una capa separada.
-
-`src/observability.py` provee logging estructurado (`architecture=... agent=...
-tool=... requested_date=... weather_check_result=... jump_assessment=...
-handoff=... calendar_write_attempt=... calendar_write_result=...`), usado por
-los tools compartidos y el CLI de cada arquitectura. No registra secretos ni
-el contenido libre del usuario. Tambien desactiva el exportador de trazas del
-SDK (`set_tracing_disabled`), necesario porque no usamos una API key de OpenAI
-para tracing.
-
-## Manual end-to-end smoke test
-
-`scripts/smoke_test.py` corre una conversacion real de 3 turnos (FAQ, reserva
-con clima real, fecha fuera de horizonte) contra Groq + Open-Meteo reales para
-las tres arquitecturas, y guarda la transcripcion en
-`docs/smoke-test-output.txt`. No es parte de la suite de pytest porque
-depende de red y de un LLM no determinista; es la verificacion end-to-end que
-complementa a los 73 tests automatizados. La corrida grabada en el
-[video demo](https://youtu.be/vHEtqMTmSos) usa este mismo script.
-
-```bash
-docker compose run --rm -v "$(pwd)/docs:/app/docs" centralized \
-  python -m scripts.smoke_test /app/docs/smoke-test-output.txt
-```
-
-## Known limitations
-
-- `CalendarService` es una implementacion in-memory pensada para demostrar el
-  flujo (no persiste entre ejecuciones ni maneja concurrencia real).
-- La busqueda de FAQs es por palabras clave sobre pares Q/A parseados del
-  archivo de texto existente, no un retriever semantico.
-- La arquitectura descentralizada, en la corrida real, a veces resuelve una
-  reserva en mas turnos que las otras dos (el agente que recibe el handoff
-  puede anunciar la transferencia antes de actuar); ver
-  `docs/analisis-arquitecturas.md` seccion 2.2.
-
-## Diagrams
-
-Fuente editable en `docs/diagrams/*.mmd` (Mermaid); son los diagramas de las
-tres arquitecturas mostrando agentes, `as_tool()`/handoffs, tools y los
-servicios/integraciones compartidos.
-
-## PDF deliverable
-
-`docs/analisis-arquitecturas.md` (fuente) y `docs/analisis-arquitecturas.pdf`
-(exportado) responden las dos preguntas obligatorias —que arquitectura
-resuelve mejor el problema y si hace falta un sistema multiagente— con
-evidencia real de la suite de tests y de `docs/smoke-test-output.txt`.
-
-## Evaluaciones con Promptfoo
-
-La hoja de evaluaciones prueba el supervisor **centralizado** porque recibe
-todas las solicitudes y delega las consultas FAQ, clima y calendario mediante
-`as_tool()`. El provider de Python en `evals/provider.py` construye ese
-supervisor real en cada caso mediante `src/agents/centralized/evaluation.py`.
-Cada caso obtiene contexto, historial, calendario y traza nuevos. `turns`
-admite un mensaje o una lista para sesiones de varios turnos. La salida de
-Promptfoo es solo la respuesta final; `metadata` contiene eventos de las
-herramientas, contexto FAQ recuperado, fecha de confirmacion tandem y
-duracion total. Las delegaciones `as_tool()` no aparecen en la traza de
-herramientas de negocio.
-
-### Requisitos e instalacion
-
-- Python 3.12 con las dependencias de `requirements.txt`.
-- Node.js 22.22.0 o superior; Node 24 LTS recomendado.
-- `LLM_API_KEY`, `LLM_BASE_URL` y `LLM_MODEL` para el agente; al ejecutar
-  evaluaciones con `factuality`, también `LLM_GRADER_MODEL`. `FAQ_PATH` es
-  opcional. No se versionan claves.
-- `PROMPTFOO_PYTHON` selecciona el Python del entorno virtual. En equipos con
-  directorio de usuario restringido, `PROMPTFOO_CONFIG_DIR` puede señalar un
-  directorio local ignorado por Git. `PROMPTFOO_DISABLE_TELEMETRY=1` desactiva
-  la telemetria opcional.
-
-### Configuración local en PowerShell
-
-Desde la raíz del repositorio, instala las dependencias declaradas. Si aún no
-existe `.venv`, créalo con Python 3.12 (`py -3.12 -m venv .venv`).
+Cada terminal nueva necesita estas variables de sesión:
 
 ```powershell
 .\.venv\Scripts\Activate.ps1
-python -m pip install -r requirements.txt
-npm ci
-
 $env:PROMPTFOO_PYTHON = (Resolve-Path ".\.venv\Scripts\python.exe").Path
 $env:PROMPTFOO_CONFIG_DIR = Join-Path (Resolve-Path .venv).Path "promptfoo-state"
+$env:PROMPTFOO_DISABLE_TELEMETRY = "1"
 $env:TEMP = Join-Path (Resolve-Path .venv).Path "tmp"
 $env:TMP = $env:TEMP
 New-Item -ItemType Directory -Force $env:TEMP | Out-Null
-```
-
-Estas variables solo existen en la sesión actual de PowerShell: al abrir otra
-terminal hay que configurarlas nuevamente. Antes de Promptfoo, comprueba que
-usa el Python con el SDK de agentes instalado:
-
-```powershell
 & "$env:PROMPTFOO_PYTHON" -c "import sys, agents; print(sys.executable); print(agents.__file__)"
 ```
 
-Si `PROMPTFOO_PYTHON` apunta fuera de `.venv`, puede aparecer
-`ModuleNotFoundError: No module named 'agents'`. La instalación por sí sola no
-configura esa variable para terminales futuras.
+Si `PROMPTFOO_PYTHON` apunta fuera de `.venv`, Promptfoo falla con
+`ModuleNotFoundError: No module named 'agents'`.
 
-Configura las cuatro variables `LLM_*` mediante un gestor de secretos o un archivo
-`.env` local ignorado por Git. Promptfoo admite `--env-file .env` al ejecutar
-los scripts; el archivo debe contener los valores reales en el equipo del
-operador. El modelo evaluado usa el SDK de OpenAI Agents y `LLM_*`. El
-evaluador de `factuality` es otro provider Promptfoo, declarado por separado
-como `openai:chat:{{ env.LLM_GRADER_MODEL }}`. Reutiliza `LLM_BASE_URL` y
-`LLM_API_KEY`; no cambia `LLM_MODEL` del agente. Para Groq, el ejemplo de
-`.env.example` usa `qwen/qwen3.8-27b` como grader verificado en Groq. Se puede poner
-el mismo valor en `LLM_GRADER_MODEL` y `LLM_MODEL`, aunque se recomienda un
-modelo rápido para evitar demoras en la calificación. Debe ser compatible con
-Chat Completions y responder al prompt de `factuality` de Promptfoo.
-
-Promptfoo 0.123.1 aplica `REQUEST_TIMEOUT_MS: 45000` desde `env` en
-`evals/promptfooconfig.yaml` a cada solicitud HTTP del grader (45 segundos).
-El grader tiene `maxRetries: 0`, por lo que un timeout se registra como fallo
-en lugar de repetir una llamada bloqueada. El provider Python tiene
-`config.timeout: 180000` (tres minutos) y ese valor prevalece sobre el límite
-global para su worker. Sin ese override, la ejecución
-`eval-ak7-2026-09-30T20:19:50` produjo `Python worker timed out after 45000ms`.
-La assertion de `factuality` sigue activa en `faq_place_date`.
-
-### Validación, ejecución y reportes
+## Pruebas
 
 ```powershell
 python -m pytest -q -p no:cacheprovider
+npm run eval:validate
+npm run test:assertions
+```
+
+La suite tiene **452 pruebas** deterministas (dominio, integraciones con
+Open-Meteo simulado, herramientas, garantías y flujos reales del Agents SDK de
+las tres arquitecturas con un modelo guionizado sin red). Ninguna llama a un LLM
+ni a Internet. `test:assertions` evalúa, con el motor de regex de JavaScript que
+usa Promptfoo, salidas buenas y malas para cada escenario; también lo ejecuta
+pytest.
+
+## Ejecutar cada arquitectura
+
+Cada una abre un chat por terminal (`Bye` o `Ctrl-C` para salir) y requiere
+credenciales reales.
+
+```bash
+python -m src.agents.centralized.main    # supervisor + especialistas via as_tool()
+python -m src.agents.hierarchical.main   # Root -> Knowledge/Booking Manager -> especialistas
+python -m src.agents.decentralized.main  # FAQ <-> Weather -> Scheduling via handoffs
+```
+
+Con Docker: `docker compose run --rm centralized` (o `hierarchical` o
+`decentralized`).
+
+### Alcance de las tres arquitecturas
+
+| | Centralizada | Jerárquica | Descentralizada |
+|---|---|---|---|
+| Agente de entrada | Central Supervisor | Root Manager | FAQ Agent |
+| Delegación | `as_tool()` a 3 especialistas | `as_tool()` a 2 managers, que delegan en especialistas | handoffs |
+| Reglas críticas | `ENTRY_AGENT_RULES` | `ENTRY_AGENT_RULES` (Root) + reglas por manager | `ENTRY_AGENT_RULES` (FAQ) + reglas de reserva |
+| Garantías de código | compartidas | compartidas | compartidas |
+| Evaluada con Promptfoo | **sí** | flujos con modelo guionizado | flujos con modelo guionizado |
+
+## Estructura
+
+```
+src/
+  config.py              # coordenadas, horizonte, carga de variables
+  domain/                # fechas, clima, citas y validaciones puras
+  integrations/          # cliente de Open-Meteo (con validación de datos)
+  services/              # WeatherService, CalendarService (in-memory), FaqService
+  tools/                 # herramientas de negocio trazadas
+  agents/
+    common/              # contexto, políticas, finalización, veracidad, grounding, CLI
+    centralized/         # arquitectura 1 + runner de evaluación
+    hierarchical/        # arquitectura 2
+    decentralized/       # arquitectura 3
+evals/                   # Promptfoo: config, provider, escenarios, fixtures, assertions
+tests/                   # unit, integration y agents (incluye modelo guionizado)
+data/                    # FAQs oficiales (sin cambios)
+```
+
+## Reglas meteorológicas
+
+Política determinista en `src/domain/weather_policy.py` ("peor condición
+prevalece"):
+
+| Variable | Ideal | Marginal | Prohibido |
+|---|---|---|---|
+| Viento en superficie | < 20 km/h | 20-28 km/h | > 28 km/h |
+| Ráfagas | - | - | > 35 km/h |
+| Precipitación | 0.0 mm | - | > 0.0 mm |
+| Cobertura de nubes | < 30 % | 30-75 % | > 75 % |
+
+MARGINAL solo permite tándem con instructor experimentado tras una confirmación
+explícita del usuario. PROHIBITED nunca crea una cita. El horizonte válido va de
+hoy a hoy + 15 días, en la zona `America/Guatemala`.
+
+## Trazas y observabilidad
+
+`context.get_tool_trace()` devuelve los eventos de las cuatro herramientas de
+negocio (`search_faq`, `check_jump_day`, `check_appointment_availability`,
+`create_appointment`) con `sequence`, `tool`, `arguments`, `result` y `status`.
+Nombre, contacto y consulta FAQ se representan con HMAC por sesión. La metadata
+exportada a Promptfoo elimina incluso esos seudónimos. Las delegaciones
+`as_tool()` y los handoffs no forman parte de esta traza de negocio. El logging
+local (`src/observability.py`) registra eventos `clave=valor` sin secretos ni
+texto libre del usuario.
+
+## Smoke test manual (consume cuota)
+
+```bash
+python -m scripts.smoke_test docs/smoke-test-output.txt
+```
+
+Usa el reloj de Guatemala, la misma finalización (`finish_turn`) que la CLI y la
+evaluación, y cierra los clientes. `docs/smoke-test-output.txt` conserva la
+corrida de HDT5.
+
+## Evaluaciones con Promptfoo
+
+El provider (`evals/provider.py`) construye el supervisor centralizado real en
+cada caso, con contexto, historial, calendario (`calendar_fixture`), reloj fijo
+(`2026-09-17`) y cliente meteorológico simulado (`weather_fixture`) nuevos. Nunca
+consulta Open-Meteo real. La salida es la respuesta final. La `metadata` incluye
+la traza, el contexto FAQ, las fechas consultadas, la confirmación tándem y
+`identity_checks`.
+
+### Comandos
+
+```powershell
 npm run eval:validate
 npm run test:assertions
 npm run eval:faq -- --env-file .env
@@ -271,143 +236,102 @@ npm run eval:report -- --env-file .env
 npm run eval:view
 ```
 
-Las fases se seleccionan por `metadata.phase` (`faq`, `booking`, `marginal`,
-`prohibited`) con `--filter-metadata`, no por posición. Para casos sueltos usa
-`npm run eval -- --filter-pattern "<descripción>" --env-file .env`. La
-concurrencia está fijada en 1 en la configuración y en los scripts.
-`eval:report` lanza una **nueva** evaluación
-completa y exporta sus resultados; no reutiliza una corrida previa porque el
-script tiene `--no-cache`. Inspecciona los fallos antes de versionar el reporte.
+- Las fases se eligen por `metadata.phase` con `--filter-metadata`, no por
+  posición. Para un caso suelto:
+  `npm run eval -- --filter-pattern "<descripción>" --env-file .env`.
+- La concurrencia está fijada en **1** en `evaluateOptions` y en los scripts.
+- El YAML fija `REQUEST_TIMEOUT_MS: 45000` y `maxRetries: 0` para el grader; el
+  provider Python usa `timeout: 180000`.
+- `eval:report` ejecuta una **nueva** corrida completa (`--no-cache`) y escribe
+  `reports/promptfoo-report.html` y `reports/promptfoo-results.json`. Revisa
+  esos archivos en busca de secretos antes de versionarlos.
 
-`eval:report` exporta `reports/promptfoo-report.html` y
-`reports/promptfoo-results.json`. Estos archivos se versionan solo tras una
-ejecucion completa real y una revision de datos sensibles y resultados
-fallidos. `--no-cache` evita reutilizar respuestas anteriores. El visor lee
-las evaluaciones locales de Promptfoo. Sin credenciales, `pytest` y
-`eval:validate` siguen disponibles, pero la evaluacion real y su reporte no.
+### Casos y métricas
 
-### Casos, datos y metricas
+Hay **43 casos**: 14 FAQ y 29 de citas. Fases: `faq` 14, `booking` 16,
+`marginal` 7 y `prohibited` 6. Cubren:
 
-Hay **43 casos**: 14 FAQ (hechos del evento, lugar reformulado, embarazo,
-restricciones, contacto, informacion ausente, saludo y despedida) y 29 citas
-(datos incompletos o invalidos, hoy, fronteras de fecha y clima, confirmacion
-marginal por viento y nubes, fechas textuales, cupo agotado con
-`calendar_fixture`, grupo mayor a la capacidad, reserva repetida, prompt
-injection, solicitud combinada con FAQ, errores, cambio de fecha y orden de
-herramientas). El reloj se fija por defecto
-en `2026-09-17`; la fecha valida de referencia es `2026-09-20`, la ultima
-`2026-10-02` y la primera fuera de horizonte `2026-10-03`.
+- **FAQ:** hechos del evento, lugar reformulado, embarazo, menor de 17 años,
+  ropa, contacto, precio y seguro ausentes, fuera de dominio, saludo y
+  despedida.
+- **Citas:** reserva hoy, ideal, sin fecha, sin contacto, datos inválidos,
+  grupo mayor a la capacidad, fecha pasada, hoy + 15 y hoy + 16, MARGINAL por
+  viento y por nubes (sin confirmar, confirmado, fecha ISO o textual distinta,
+  fecha textual correcta), PROHIBITED por viento, ráfagas, lluvia y nubes,
+  error meteorológico, cupo agotado, reserva repetida, cambio de fecha, omisión
+  de clima, prompt injection y solicitud combinada de cita y FAQ.
 
-Los perfiles de `evals/fixtures/weather.json` tienen ideal 10/15/0/10/25,
-viento marginal 20 y 28 km/h, viento prohibido 28.1, rafagas prohibidas 35.1,
-lluvia 0.1, nubes marginales 75, nubes prohibidas 75.1 y un error controlado.
-Cada caso crea un cliente falso nuevo. El provider sustituye el servicio
-meteorologico antes de procesar mensajes; ninguna prueba deterministica
-consulta Open-Meteo real. El calendario tambien es simulado en memoria.
+Tipos de assertion:
 
-- `contains` y `regex` revisan hechos concretos de la respuesta; la
-  assertion `python` comprueba metadatos y falla si faltan. Verifica
-  herramientas presentes o ausentes, recuento, orden exacto, fecha,
-  `party_size`, estado y resultado. Compara SHA-256 de nombre y contacto
-  ficticios para confirmar los argumentos sin exponerlos en la traza.
-- `factuality` compara la respuesta con la referencia del corpus FAQ en
-  `faq_place_date`, el unico caso de los 32 que conserva esa assertion.
-  Es una calificacion de modelo y puede variar; no sustituye las
-  verificaciones deterministas ni garantiza que se haya llamado una herramienta.
-  Las citas usan `regex` para hechos concretos y `python` para reglas y trazas
-  estructuradas. En `eval-Lpp-2026-10-03T05:14:42`, el grader marco como fallo
-  una respuesta marginal correcta y dio `RateLimitExhaustedError` al evaluar
-  el viento prohibido. Por eso no se usa `factuality` para esas citas.
-  En `faq_minor` se retiro `factuality` tras falsos negativos repetidos cuando
-  el corpus incluye una regla general de 18 anos con una excepcion explicita
-  para 16 y 17 anos. Sus assertions deterministas comprueban los 17 anos,
-  acompanamiento por padres o tutores, carta de responsabilidad y traza FAQ.
-  En los otros casos, hechos exactos como peso, telefono, ropa y fecha se
-  comprueban con `contains` o `regex`, junto con la traza de herramientas.
-  El grader requiere cuota del proveedor aun con concurrencia uno; conservarlo
-  en una FAQ permite demostrarlo sin depender de el para reglas de citas.
-- `latency` usa 60 000 ms para FAQ y 180 000 ms para citas. El provider mide
-  desde la construccion del supervisor hasta la ultima respuesta, incluidos
-  todos los turnos y herramientas; el evaluador de factualidad se ejecuta
-  despues y no forma parte de ese tiempo. Estos limites permiten varias
-  llamadas del agente y distinguen consultas simples del flujo orquestado.
+- `regex`, `contains` y sus negaciones verifican hechos y rechazan respuestas
+  malas: confirmación falsa, precio o cobertura inventados, otros teléfonos o
+  pesos, conocimiento general.
+- La assertion `python` (`evals/assertions/tool_trace.py`) verifica:
+  - presencia y ausencia de herramientas, conteos sobre éxitos y creación real;
+  - orden como subsecuencia de eventos exitosos (se toleran errores intermedios
+    inofensivos), y además que todo `create_appointment` exitoso siga, para la
+    misma fecha, a un clima y una disponibilidad exitosos;
+  - argumentos, resultados, identidad por booleanos y ausencia de Open-Meteo
+    real.
+- `factuality` permanece solo en `faq_place_date`: **como máximo 1 llamada al
+  grader por corrida completa** (`maxRetries: 0`). No sustituye las
+  verificaciones deterministas.
+- `latency`: 60 000 ms en FAQ y 180 000 ms por defecto.
 
-| Requisito | Archivos |
-|-----------|----------|
-| Supervisor centralizado y sesiones aisladas | `src/agents/centralized/evaluation.py`, `evals/provider.py` |
-| FAQs y contexto recuperado | `evals/faq_scenarios.yaml`, `src/tools/faq_tools.py`, `src/agents/common/context.py` |
-| Citas y herramientas | `evals/appointment_scenarios.yaml`, `evals/assertions/tool_trace.py`, `src/tools/calendar_tools.py` |
-| Clima y reloj deterministas | `evals/fixtures/weather.py`, `evals/fixtures/weather.json` |
-| Factuality y latencia | `evals/promptfooconfig.yaml`, archivos de casos |
-| Instalacion y reproduccion | `package.json`, `package-lock.json`, este README |
-| Reporte real | `reports/` despues de ejecutar `npm run eval:report` |
+### Cómo clasificar resultados
 
-Las respuestas del modelo pueden variar entre ejecuciones y algunos casos
-pueden fallar si el supervisor omite una herramienta obligatoria. Conservar
-esos fallos permite auditar el comportamiento. El corpus FAQ usa busqueda
-lexica; una reformulacion puede no recuperar la entrada deseada. Los casos
-solo instrumentan herramientas de negocio, no las delegaciones internas del
-SDK. No se debe interpretar un `eval:validate` exitoso como aprobacion de
-las 32 evaluaciones: requiere las credenciales y una corrida completa.
+- **ERROR (infraestructura):** cuota (`RateLimitError`), timeouts, worker,
+  configuración o credenciales. No es un fallo del agente. El provider reporta
+  `Proveedor LLM: …`, `Configuracion: …`, `Escenario invalido: …` o
+  `Fixture invalido: …`.
+- **FAIL (agente):** respuesta incorrecta, herramienta omitida o fuera de orden,
+  o argumento erróneo, contrastado con la traza de `metadata`.
+- **Assertion frágil:** solo si la respuesta es semánticamente correcta. Se
+  corrige ampliando alternativas sin quitar el requisito, y se añade el caso a
+  `evals/tests/assertion_cases.yaml`.
 
-### Estado de la hoja de evaluaciones
+### Historial de evaluaciones
 
-| Componente | Estado |
-|---|---|
-| Integración Promptfoo | Implementada |
-| Provider Python | Implementado; ejecuta el supervisor real |
-| Arquitectura centralizada | Conectada con sesiones aisladas y reloj fijo |
-| Fixtures meteorológicos | Nueve perfiles simulados; los casos determinísticos no consultan Open-Meteo real |
-| 12 casos FAQ | Implementados; ejecución completa pendiente |
-| 20 casos de citas | Implementados; ejecución completa pendiente |
-| Primeros 3 casos FAQ | **3/3 aprobados en una corrida real parcial anterior** (`faq_place_date`, `faq_weight`, `faq_camera`) |
-| Suite Python | **138 aprobadas** en la verificación actual |
-| Configuración Promptfoo | Válida en la verificación actual |
-| Evaluación completa de 32 casos | Pendiente |
-| Reporte HTML/JSON | Pendiente; ninguno de los dos archivos existe aún |
+Ninguna de las corridas guardadas en la base local de Promptfoo se ejecutó con el
+código de esta rama (`fix-audit-findings`). Se conservan como evidencia
+histórica. Commit = último commit anterior a la hora de la corrida.
 
-Los 3/3 son un resultado **parcial e histórico**, no el porcentaje final. La
-base local de Promptfoo también conserva intentos posteriores incompletos:
-uno registra **1 aprobado, 0 fallidos y 4 errores** en cinco casos FAQ. La
-evaluación `eval-Mxc-2026-09-30T18:59:19` quedó pausada mientras esperaba un
-grader de `factuality`. No se deben sustituir ni ocultar estos intentos con
-el resultado anterior. La última corrida completa de los 12 FAQ, de los
-20 casos de citas y de los 32 casos combinados sigue pendiente.
+| ID | Commit | Casos | Pass / Fail / Error | ¿Evidencia válida? |
+|---|---|---|---|---|
+| `eval-Zww…`, `eval-iZA…`, `eval-LT1…` | `a3bad51`, `06573b7` | 3 / 1 / 3 | 0 / 0 / 7 | No: configuración y worker |
+| `eval-go9…` | `06573b7` | 1 | 1 / 0 / 0 | No: salida de prueba |
+| `eval-3s7…`, `eval-Neq…`, `eval-qKX…`, `eval-2w7…` | `06573b7`–`03c04cd` | 1–3 | 3 / 3 / 0 | Histórica: assertions frágiles ya corregidas |
+| `eval-6iS…`, `eval-bS5…`, `eval-PjS…`, `eval-JVv…` | `bc77f39` | 3–7 | 7 / 2 / 9 | Parcial: los errores son abortos del worker; `bS5` = 3/3 FAQ |
+| `eval-iYS…`, `eval-Mxc…` | `2e00751` | 12 + 12 | 10 / 4 / 10 | Parcial: `Mxc` alucinó fecha y lugar tras recuperar; respuestas de conocimiento general |
+| `eval-fXo…`, `eval-f5T…`, `eval-CDy…` | `6d7fa23` | 3 / 12 / 5 | 5 / 4 / 11 | Parcial: abortos del worker |
+| `eval-jqu…`, `eval-5x3…`, `eval-ak7…` | `1e585d2` | 1 / 1 / 5 | 3 / 1 / 3 | No: grader inexistente (404) y timeout de 45 s |
+| `eval-ex7…` | `a033bee` | 5 | 3 / 2 / 0 | Histórica |
+| `eval-wSL…`, `eval-riE…` | `c5caa1b` | 5 + 12 | 11 / 3 / 3 | Parcial: 3 errores del grader (cuota o timeout) |
+| `eval-bXX…` | `33d762a` | 12 | 10 / 2 / 0 | Válida para ese commit: teléfono inventado sin `search_faq` |
+| `eval-DPY…` | `ee5516b` | 12 | 10 / 2 / 0 | Válida para ese commit |
+| `eval-4Tl…` | `a774783` | 12 | 10 / 1 / 1 | Parcial: 1 `RateLimitExhaustedError` |
+| `eval-SCd…` | `de8f026` | 20 citas | 10 / 2 / 8 | Parcial: 8 errores de cuota no cuentan como fallos |
+| `eval-zff…`, `eval-A6y…`, `eval-ulh…` | `de8f026`, `53b12e4` | 3 / 2 / 2 | 0 / 0 / 7 | No: solo `RateLimitError` |
+| `eval-cYY…`, `eval-IPr…` | `53b12e4`, `6d2ea60` | 2 / 1 | 1 / 2 / 0 | Válida: respuesta "No." tras reservar |
+| `eval-ykO…` | `fad7f3f` | 1 | 1 / 0 / 0 | Válida para ese commit |
+| `eval-Lpp…` | `fad7f3f` | 3 | 0 / 2 / 1 | Válida: confirmación alucinada sin `create_appointment` |
+| `eval-RGS…` | `5c2fd60` | 3 | 0 / 3 / 0 | Válida: marginal confirmado sin crear, PROHIBITED sin umbral |
 
-Un intento inicial tuvo un problema de selección de Python y no encontró el
-módulo `agents`; después de configurar `PROMPTFOO_PYTHON` se obtuvo el 3/3
-parcial usando el agente real con Groq. Las advertencias
-`OPENAI_API_KEY is not set, skipping trace export` (exportación opcional de
-trazas del SDK) y la advertencia experimental de Node no impidieron esa
-ejecución. La evaluación usa `LLM_API_KEY`, `LLM_BASE_URL`, `LLM_MODEL` y
-`LLM_GRADER_MODEL`; `.env` está ignorado por Git y sus valores no deben
-aparecer en documentación ni reportes.
+Las corridas posteriores sobre esta rama se documentan en la sección
+"Resultados en `fix-audit-findings`" en cuanto existan. No hay resultados
+nuevos hasta ejecutarlos.
 
-### Trabajo pendiente
+## Límites conocidos
 
-1. Ejecutar nuevamente `python -m pytest -q -p no:cacheprovider`.
-2. Validar con `npm run eval:validate`.
-3. Ejecutar los 12 FAQ con `npm run eval -- --filter-first-n 12 --max-concurrency 1 --env-file .env`.
-4. Revisar y clasificar cada fallo o error, incluidos los intentos parciales posteriores al 3/3.
-5. Corregir solo assertions frágiles cuando la respuesta sea realmente correcta.
-6. Mantener las assertions exigentes ante errores reales del agente.
-7. Ejecutar los casos de citas en grupos pequeños.
-8. Verificar herramientas, argumentos, resultados y orden mediante la metadata.
-9. Ejecutar los 32 casos.
-10. Generar HTML y JSON mediante `npm run eval:report -- --max-concurrency 1 --env-file .env`.
-11. Revisar ambos reportes para detectar secretos; conservar los fallos reales.
-12. Crear el commit final del reporte tras una corrida real verificada.
-13. Confirmar que `git status --short` esté vacío.
-14. Hacer push únicamente si el usuario lo solicita.
-
-### Cómo clasificar un fallo
-
-- **Error:** fallo del provider, dependencias, variables de entorno o ejecución; no se cuenta como respuesta incorrecta del agente.
-- **Fallo del agente:** respuesta incorrecta, omisión de una herramienta obligatoria, argumento erróneo u orden indebido.
-- **Assertion frágil:** respuesta semánticamente correcta que cambia solo en Markdown, espacios Unicode, acentos o redacción equivalente.
-- **Factuality:** contrastar la respuesta con el corpus FAQ o la referencia de política/fixture correspondiente; el juicio del evaluador no sustituye la evidencia.
-- **Tool execution:** contrastar la traza estructurada en `metadata`, no solo el texto final.
-
-Flexibiliza una assertion únicamente si preserva el requisito semántico que
-debía comprobar. No generes ni versiones un reporte hasta ejecutar realmente
-la evaluación completa y revisar los resultados.
+- El calendario es in-memory: no persiste entre ejecuciones ni entre procesos.
+- La recuperación FAQ es léxica, con alias controlados. Una reformulación lejana
+  puede producir una abstención correcta en lugar de una respuesta.
+- La finalización determinista completa una reserva solo con intención explícita
+  (un verbo de reserva sin signo de pregunta) y con todos los datos válidos.
+  Una pregunta como "¿Se puede reservar…?" no reserva por sí sola.
+- El grounding considera nombres propios de varias palabras con mayúscula. Una
+  ubicación inventada escrita toda en minúsculas puede no detectarse.
+- Las respuestas del modelo varían entre corridas. Las garantías de código
+  limitan qué puede afirmar o ejecutar, pero no su redacción.
+- No se pudo auditar vulnerabilidades de dependencias sin red (`npm audit` o
+  `pip-audit` pendientes).

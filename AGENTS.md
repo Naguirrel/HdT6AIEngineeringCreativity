@@ -1,125 +1,139 @@
-# Guía operativa para agentes: Parachute S.A.
+# Guía operativa para agentes: Parachute S.A. (HDT6)
 
 ## Contexto y estado
 
-Este proyecto académico conserva tres arquitecturas de agentes de la hoja
-anterior: centralizada, jerárquica y descentralizada. La nueva hoja evalúa
-**solo la arquitectura centralizada** con Promptfoo. Sus dos funciones son
-responder FAQs usando el corpus oficial y calendarizar citas después de
-validar fecha y clima.
+El proyecto conserva tres arquitecturas de agentes (centralizada, jerárquica y
+descentralizada) que comparten dominio, herramientas, políticas y garantías. La
+hoja HDT6 evalúa con Promptfoo **solo la arquitectura centralizada**: responder
+FAQs con el corpus oficial y calendarizar citas tras validar fecha, clima, cupo
+y, si el clima es MARGINAL, la confirmación tándem explícita del usuario.
 
-La integración, el provider Python, el runner programático y los nueve perfiles
-meteorológicos simulados están implementados. Hay **32 casos definidos**:
-12 FAQ y 20 de citas. Una corrida real parcial anterior aprobó los primeros
-tres FAQ (`faq_place_date`, `faq_weight`, `faq_camera`), **3/3**. La base local
-también conserva intentos posteriores incompletos; uno registra 1 aprobado y
-4 errores de ejecución en cinco FAQ. La evaluación
-`eval-Mxc-2026-09-30T18:59:19` quedó pausada durante la calificación de
-`factuality`. **No** se ha completado la corrida de 12 FAQ, la de 20 citas ni
-la de 32 casos. Los reportes HTML/JSON aún no existen.
-
-La verificación Python actual aprobó **138 pruebas** y `npm run eval:validate`
-confirmó que la configuración de Promptfoo es válida. El resultado 3/3 es
-parcial e histórico; no representa el porcentaje final de la hoja.
+La rama `fix-audit-findings` corrige los 27 hallazgos de la auditoría
+(AUD-001 a AUD-027). Hay **43 casos** Promptfoo (14 FAQ y 29 de citas),
+agrupados por `metadata.phase`: `faq`, `booking`, `marginal` y `prohibited`.
+La suite Python tiene **452 pruebas** y `npm run eval:validate` valida la
+configuración. Las corridas Promptfoo históricas se ejecutaron con código
+anterior: ver la tabla del README. Cualquier corrida nueva sobre esta rama se
+registra con su ID y commit exactos.
 
 ## Reglas obligatorias
 
 1. Leer `README.md`, este archivo, `package.json`,
    `evals/promptfooconfig.yaml` y los casos relevantes antes de modificar.
-2. Ejecutar `git status --short` antes y después. Trabajar en
-   `promptfoo-evals`, salvo instrucción explícita contraria. No modificar
-   `main` ni `fix-pre-errors`.
-3. No modificar `.env`, leer o mostrar el valor de `LLM_API_KEY`, ni incluir
-   secretos en archivos, logs, documentación o reportes. `.env` está ignorado
-   por Git.
-4. No llamar Open-Meteo real en evaluaciones determinísticas. Mantener el
-   cliente falso y el reloj fijo por caso; no agregar persistencia ni
-   servicios externos. El calendario debe seguir simulado en memoria.
-5. No inventar resultados, generar reportes ficticios ni editar reportes a
-   mano. Conservar los fallos reales y no debilitar assertions para elevar
-   artificialmente el porcentaje.
-6. No hacer push ni merge sin solicitud explícita. Mantener un commit por
-   problema o etapa, separado y descriptivo.
-7. Ejecutar pytest después de cambios Python y validar Promptfoo después de
-   cambios YAML. Ejecutar subconjuntos antes de la suite completa.
-8. Tratar variaciones de Markdown, espacios Unicode, acentos o redacción
-   equivalente como posibles assertions frágiles, no automáticamente como
-   errores factuales. Comprobar siempre el requisito semántico.
-9. No modificar el corpus FAQ, los umbrales meteorológicos ni el calendario
-   en memoria sin autorización. Al cambiar código compartido, conservar la
-   compatibilidad con las tres arquitecturas.
+2. Ejecutar `git status --short` antes y después. No modificar `main`,
+   `promptfoo-evals` ni `fix-pre-errors` salvo instrucción explícita.
+3. No modificar `.env`, no leer ni mostrar `LLM_API_KEY` y no incluir secretos
+   en archivos, logs, documentación o reportes. `.env` está ignorado por Git y
+   por Docker; `tests/unit/test_build_config.py` lo comprueba.
+4. No llamar a Open-Meteo real en evaluaciones deterministas: usar
+   `weather_fixture`, `calendar_fixture` y el reloj fijo por caso. El
+   calendario sigue siendo simulado en memoria.
+5. No inventar resultados, no generar reportes ficticios y no editar reportes a
+   mano. Conservar los fallos reales y no debilitar assertions para subir el
+   porcentaje.
+6. No hacer push, merge ni PR sin solicitud explícita. Un commit por problema o
+   etapa.
+7. Ejecutar pytest tras cambios Python, `npm run eval:validate` y
+   `npm run test:assertions` tras cambios YAML, y `git diff --check` antes de
+   cada commit.
+8. Una variación de Markdown, espacios Unicode, acentos o redacción equivalente
+   es una posible assertion frágil, no automáticamente un error factual. Si se
+   amplía una assertion, añadir la salida buena y una mala a
+   `evals/tests/assertion_cases.yaml`.
+9. No modificar el corpus FAQ, los umbrales meteorológicos ni la capacidad sin
+   autorización. Las reglas críticas viven en `src/agents/common/policies.py`
+   y las garantías en código; mantener las tres arquitecturas alineadas.
+
+## Garantías que no deben romperse
+
+- `finish_turn` (CLI, evaluación y smoke test) completa reservas listas,
+  elimina afirmaciones de citas inexistentes y aplica el grounding de entidades.
+- `create_appointment` exige clima vigente, disponibilidad posterior para la
+  misma fecha y el mismo grupo, y confirmación tándem si el clima es MARGINAL.
+- La traza usa HMAC por sesión. La metadata exportada no contiene datos
+  personales ni seudónimos. La exportación de trazas del SDK está desactivada.
 
 ## Preparación obligatoria en PowerShell
 
-Desde la raíz del repositorio, con `.venv` y dependencias instaladas:
+Desde la raíz del repositorio, con `.venv` y dependencias instaladas
+(`python -m pip install -r requirements.lock.txt` y `npm ci`):
 
 ```powershell
 .\.venv\Scripts\Activate.ps1
 $env:PROMPTFOO_PYTHON = (Resolve-Path ".\.venv\Scripts\python.exe").Path
 $env:PROMPTFOO_CONFIG_DIR = Join-Path (Resolve-Path .venv).Path "promptfoo-state"
+$env:PROMPTFOO_DISABLE_TELEMETRY = "1"
 $env:TEMP = Join-Path (Resolve-Path .venv).Path "tmp"
 $env:TMP = $env:TEMP
 New-Item -ItemType Directory -Force $env:TEMP | Out-Null
 & "$env:PROMPTFOO_PYTHON" -c "import sys, agents; print(sys.executable); print(agents.__file__)"
 ```
 
-Estas variables solo duran la sesión actual; configurarlas de nuevo en cada
-terminal. `PROMPTFOO_PYTHON` debe apuntar a `.venv\Scripts\python.exe`.
-Si apunta a otro intérprete, Promptfoo puede fallar con
-`ModuleNotFoundError: No module named 'agents'`. El agente y el evaluador
-usan `LLM_API_KEY` y `LLM_BASE_URL`. El agente usa `LLM_MODEL`; el grader de
-`factuality` usa `LLM_GRADER_MODEL`. Para Groq, configurar en `.env` local
-`LLM_GRADER_MODEL=qwen/qwen3.8-27b` es un ejemplo verificado en Groq. Puede igualar
-`LLM_MODEL` si se desea, pero se recomienda un grader rápido. El YAML fija
-`REQUEST_TIMEOUT_MS: 45000` para las solicitudes HTTP de Promptfoo y
-`maxRetries: 0` para el grader. El provider Python fija
-`config.timeout: 180000` para su worker y no hereda los 45 segundos. Mantener
-`--max-concurrency 1` al ejecutar las evaluaciones. No quitar la assertion
-`factuality`.
-No imprimir sus valores.
+Las variables solo duran la sesión actual. El agente usa `LLM_API_KEY`,
+`LLM_BASE_URL` y `LLM_MODEL`; el grader de `factuality` usa
+`LLM_GRADER_MODEL` (un solo caso: `faq_place_date`, como máximo 1 llamada por
+corrida completa). La concurrencia está fijada en 1 en la configuración y en los
+scripts. El YAML fija `REQUEST_TIMEOUT_MS: 45000` y `maxRetries: 0` para el
+grader; el provider Python usa `timeout: 180000`.
 
-## Procedimiento para continuar
+## Procedimiento de evaluación
 
-Primero repetir pytest y la validación como indica el README. El **primer eval
-pendiente** es:
+1. Verificación local, sin LLM:
 
-```powershell
-npm run eval:faq -- --env-file .env
-```
+   ```powershell
+   python -m pytest -q -p no:cacheprovider
+   npm run eval:validate
+   npm run test:assertions
+   git diff --check
+   ```
 
-Clasificar cada error y fallo sin confundir problemas del provider con fallos
-del agente. Corregirlos uno por uno, manteniendo las assertions semánticas.
-Después ejecutar citas en grupos pequeños y verificar las llamadas de
-herramientas, argumentos, resultados, errores, recuento y orden desde
-`metadata`; el texto final por sí solo no demuestra ejecución. Las
-delegaciones internas `as_tool()` no forman parte de esa traza de negocio.
+2. Fases con LLM, una a la vez. Ante un `RateLimitError` no repetir de
+   inmediato.
 
-Luego ejecutar los 32 casos y generar el reporte **real** con el script
-`eval:report` de `package.json`. Inspeccionar HTML y JSON en busca de secretos,
-conservar los fallos y crear el commit final del reporte. No hacer push salvo
-solicitud explícita. La advertencia de exportación opcional de trazas
-`OPENAI_API_KEY is not set, skipping trace export` y la advertencia
-experimental de Node no bloquearon la corrida parcial anterior.
+   ```powershell
+   npm run eval:faq -- --env-file .env
+   npm run eval:booking -- --env-file .env
+   npm run eval:marginal -- --env-file .env
+   npm run eval:prohibited -- --env-file .env
+   ```
+
+3. Clasificar cada resultado:
+   - **ERROR** de infraestructura: `Proveedor LLM: …`, timeouts, worker o
+     configuración.
+   - **FAIL** del agente: contrastar con `metadata.tool_calls`; el texto final
+     por sí solo no demuestra ejecución.
+
+   Corregir la causa en un commit propio y repetir solo los casos afectados con
+   `--filter-pattern`.
+
+4. Suite completa y reporte real, con revisión de secretos:
+
+   ```powershell
+   npm run eval:report -- --env-file .env
+   Select-String -Path reports\promptfoo-results.json,reports\promptfoo-report.html -Pattern "gsk_|sk-|Bearer|LLM_API_KEY" -List
+   ```
+
+   La búsqueda debe quedar vacía antes de versionar.
 
 ## Criterios de finalización
 
-Solo declarar terminada la hoja cuando pytest pase, la configuración sea
-válida, los **32 casos se hayan ejecutado**, cada fallo se haya revisado,
-existan reportes HTML y JSON procedentes de una corrida real, ambos estén
-libres de secretos, el README refleje los resultados finales reales, el árbol
-de Git esté limpio y los commits estén separados y descritos. El calendario
-seguirá siendo simulado en memoria.
+Pytest, `eval:validate` y `test:assertions` en verde. Los 43 casos ejecutados en
+una corrida completa real, cada fallo revisado, reportes HTML y JSON reales y sin
+secretos, el README con los resultados reales y el árbol de Git limpio. Si la
+corrida no puede completarse por cuota o credenciales, documentar el bloqueo y
+no declarar la hoja terminada.
 
 ## Archivos importantes
 
-| Función | Ruta verificada |
+| Función | Ruta |
 |---|---|
 | Configuración Promptfoo | `evals/promptfooconfig.yaml` |
 | Provider Python | `evals/provider.py` |
 | Runner del supervisor centralizado | `src/agents/centralized/evaluation.py` |
-| Casos FAQ | `evals/faq_scenarios.yaml` |
-| Casos de citas | `evals/appointment_scenarios.yaml` |
-| Fixtures meteorológicos | `evals/fixtures/weather.py`, `evals/fixtures/weather.json` |
+| Casos FAQ y de citas | `evals/faq_scenarios.yaml`, `evals/appointment_scenarios.yaml` |
+| Corpus bueno/malo de assertions | `evals/tests/assertion_cases.yaml`, `evals/tests/check_assertions.js` |
+| Fixtures | `evals/fixtures/weather.*`, `evals/fixtures/calendar.*` |
 | Assertion de herramientas | `evals/assertions/tool_trace.py` |
-| Instrucciones y comandos | `README.md`, `package.json` |
-| Directorio de reportes | `reports/` (solo contiene `.gitkeep` por ahora) |
+| Reglas compartidas | `src/agents/common/policies.py` |
+| Finalización, veracidad, grounding | `src/agents/common/booking_completion.py`, `truthfulness.py`, `grounding.py` |
+| Reportes | `reports/` (solo tras una corrida completa real) |
