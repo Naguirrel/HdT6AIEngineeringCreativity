@@ -1,5 +1,4 @@
 import json
-import hashlib
 from datetime import timedelta
 
 from tests.agents.conftest import FIXED_TODAY, make_snapshot
@@ -31,8 +30,8 @@ def test_trace_records_order_arguments_and_results(build_context):
     assert trace[1]["result"] == {"available": True}
     assert trace[2]["arguments"]["customer_name_provided"] is True
     assert trace[2]["arguments"]["contact_provided"] is True
-    assert trace[2]["arguments"]["customer_name_sha256"] == hashlib.sha256(b"Ana Lopez").hexdigest()
-    assert trace[2]["arguments"]["contact_sha256"] == hashlib.sha256(b"ana@example.com").hexdigest()
+    assert trace[2]["arguments"]["customer_name_hmac"] == context.pseudonymize("Ana Lopez")
+    assert trace[2]["arguments"]["contact_hmac"] == context.pseudonymize("ana@example.com")
     assert trace[2]["result"]["created"] is True
     assert "Ana Lopez" not in json.dumps(trace)
     assert "ana@example.com" not in json.dumps(trace)
@@ -64,9 +63,7 @@ def test_faq_trace_hides_query_and_sessions_are_isolated(build_context):
     assert first_trace[0]["tool"] == "search_faq"
     assert first_trace[0]["result"]["match_count"] >= 1
     assert first_trace[0]["arguments"]["query_length"] > 0
-    assert first_trace[0]["arguments"]["query_sha256"] == hashlib.sha256(
-        f"peso maximo {secret}".encode("utf-8")
-    ).hexdigest()
+    assert first_trace[0]["arguments"]["query_hmac"] == first.pseudonymize(f"peso maximo {secret}")
     assert secret not in json.dumps(first_trace)
     assert second.get_tool_trace() == []
     first_trace[0]["result"]["match_count"] = 999

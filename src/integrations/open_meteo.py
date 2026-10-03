@@ -42,15 +42,15 @@ class OpenMeteoClient:
             "end_date": requested_date.isoformat(),
         }
 
+        # Error messages never include the HTTP body, URL or exception text: they may reach the
+        # model and the user. The exception chain keeps the detail for local debugging only.
         try:
             response = requests.get(self.base_url, params=params, timeout=self.timeout_seconds)
         except requests.RequestException as error:
-            raise OpenMeteoError(f"Fallo de red al consultar Open-Meteo: {error}") from error
+            raise OpenMeteoError(f"Fallo de red al consultar Open-Meteo ({type(error).__name__}).") from error
 
         if response.status_code != 200:
-            raise OpenMeteoError(
-                f"Open-Meteo respondio con estado {response.status_code}: {response.text[:200]}"
-            )
+            raise OpenMeteoError(f"Open-Meteo respondio con estado HTTP {response.status_code}.")
 
         try:
             payload = response.json()

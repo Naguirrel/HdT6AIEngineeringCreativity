@@ -1,7 +1,5 @@
 """Tool compartido para consultar la base de FAQs existente."""
 
-import hashlib
-
 from agents import RunContextWrapper, function_tool
 
 from src.agents.common.context import ParachuteContext, records_output
@@ -15,7 +13,7 @@ def answer_from_faq(context: ParachuteContext, query: str) -> str:
     context.record_faq_entries([{"question": entry.question, "answer": entry.answer} for entry in entries])
     context.record_tool_event(
         "search_faq",
-        {"query_sha256": hashlib.sha256(query.encode("utf-8")).hexdigest(), "query_length": len(query)},
+        {"query_hmac": context.pseudonymize(query), "query_length": len(query)},
         {"match_count": len(entries)},
         "success",
     )

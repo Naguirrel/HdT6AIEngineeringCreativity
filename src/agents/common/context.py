@@ -9,7 +9,10 @@ from dataclasses import dataclass, field
 from copy import deepcopy
 from datetime import date
 import functools
+import hashlib
+import hmac
 import re
+import secrets
 from typing import Callable
 
 from src.agents.common.user_message import extract_booking_details, normalize_text
@@ -84,6 +87,16 @@ class ParachuteContext:
     user_messages: list[str] = field(default_factory=list)
     last_user_message: str = ""
     _tool_trace: list[dict] = field(default_factory=list, repr=False)
+    # Ephemeral per-session key: pseudonyms cannot be reversed by dictionary attacks
+    # or compared across sessions/runs, and the key is never stored or exported.
+    _trace_key: bytes = field(default_factory=lambda: secrets.token_bytes(32), repr=False)
+
+    def pseudonymize(self, value: object) -> str | None:
+        """HMAC-SHA256 of a normalized personal value, valid only inside this session."""
+        if not isinstance(value, str) or not value.strip():
+            return None
+        normalized = " ".join(value.split()).casefold()
+        return hmac.new(self._trace_key, normalized.encode("utf-8"), hashlib.sha256).hexdigest()
 
     def record_tool_event(self, tool: str, arguments: dict, result: dict, status: str) -> None:
         if status not in {"success", "error"}:

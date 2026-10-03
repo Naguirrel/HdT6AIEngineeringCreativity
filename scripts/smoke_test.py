@@ -16,7 +16,7 @@ from src.agents.centralized.main import build_supervisor
 from src.agents.common.booking_completion import finish_turn
 from src.agents.decentralized.main import build_entry_agent
 from src.agents.hierarchical.main import build_root_manager
-from src.observability import configure_logging
+from src.observability import configure_logging, user_facing_error
 
 VALID_DATE = (date.today() + timedelta(days=3)).isoformat()
 OUT_OF_RANGE_DATE = (date.today() + timedelta(days=200)).isoformat()
@@ -39,7 +39,7 @@ async def run_architecture(name: str, starting_agent, context) -> list[str]:
         try:
             result = await Runner.run(current_agent, history, context=context)
         except Exception as error:
-            lines.append(f"[ERROR] {error}")
+            lines.append(f"[ERROR] {user_facing_error(error, architecture=name, stage='smoke')}")
             continue
         lines.append(f"[{result.last_agent.name}]: {finish_turn(context, result.final_output)}")
         history = result.to_input_list()

@@ -1,7 +1,6 @@
 """Promptfoo assertion that checks real business-tool events in provider metadata."""
 
 from collections import Counter
-import hashlib
 
 
 def _result(passed: bool, reason: str):
@@ -79,13 +78,11 @@ def get_assert(output: str, context: dict):
         bookings = [event for event in events if event.get("tool") == "create_appointment"]
         if not bookings:
             return _result(False, "No se intentó crear la cita con datos de cliente")
-        arguments = bookings[-1].get("arguments") or {}
-        for variable, key in (("expect_customer_name", "customer_name_sha256"),
-                              ("expect_contact", "contact_sha256")):
-            if variable in variables:
-                digest = hashlib.sha256(variables[variable].strip().encode("utf-8")).hexdigest()
-                if arguments.get(key) != digest:
-                    return _result(False, f"No coincide el dato ficticio {variable}")
+        # The provider compares per-session HMACs in-process and exports only booleans.
+        checks = metadata.get("identity_checks") or {}
+        for variable, key in (("expect_customer_name", "customer_name"), ("expect_contact", "contact")):
+            if variable in variables and checks.get(key) is not True:
+                return _result(False, f"No coincide el dato ficticio {variable}")
     if "expect_confirmed_tandem_date" in variables:
         if metadata.get("confirmed_tandem_date") != variables["expect_confirmed_tandem_date"]:
             return _result(False, "La confirmación tándem no corresponde a la fecha evaluada")

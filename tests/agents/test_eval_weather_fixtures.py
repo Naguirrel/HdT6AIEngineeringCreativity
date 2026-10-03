@@ -39,8 +39,9 @@ def test_fixture_error_and_unknown_name():
 
     with pytest.raises(FixtureError):
         make_weather_service("missing")
-    with pytest.raises(WeatherServiceError, match="simulado"):
+    with pytest.raises(WeatherServiceError, match="No fue posible obtener el pronostico") as raised:
         make_weather_service("error").check_jump_day(VALID_DATE, TODAY)
+    assert "simulado" in str(raised.value.__cause__)  # detail kept only in the exception chain
 
 
 def test_clock_horizon_and_no_network_for_invalid_date():

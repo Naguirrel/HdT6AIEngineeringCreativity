@@ -5,16 +5,23 @@ testeables sin el runtime de agentes; los decoradores @function_tool solo las
 conectan al contexto de la conversacion.
 """
 
-import hashlib
 
 from agents import RunContextWrapper, function_tool
 
 from src.agents.common.context import ParachuteContext, records_output
-from src.domain.appointment_models import AppointmentData, AppointmentRecord
+from src.domain.appointment_models import AppointmentData, AppointmentRecord, normalize_contact
 from src.domain.dates import normalized_date_or_none, parse_date_argument
 from src.domain.weather_models import Decision
 from src.observability import log_event
 from src.services.calendar_service import CalendarConflictError, CalendarServiceError
+
+
+def contact_identity(contact: object) -> object:
+    """Canonical contact used for pseudonyms, so '5555 1234' and '+50255551234' match."""
+    try:
+        return normalize_contact(contact)
+    except ValueError:
+        return contact
 
 
 def _requested_party_size(context: ParachuteContext, party_size: int | None) -> int | None:
@@ -102,10 +109,9 @@ def book_appointment(
         "date_str": normalized_date_or_none(date_str),
         "customer_name_provided": isinstance(customer_name, str) and bool(customer_name.strip()),
         "contact_provided": isinstance(contact, str) and bool(contact.strip()),
-        "customer_name_sha256": hashlib.sha256(customer_name.strip().encode("utf-8")).hexdigest()
-        if isinstance(customer_name, str) else None,
-        "contact_sha256": hashlib.sha256(contact.strip().encode("utf-8")).hexdigest()
-        if isinstance(contact, str) else None,
+        # Keyed per session (HMAC); never plain or static hashes of personal data.
+        "customer_name_hmac": context.pseudonymize(customer_name),
+        "contact_hmac": context.pseudonymize(contact_identity(contact)),
         "is_experienced_tandem": is_experienced_tandem if type(is_experienced_tandem) is bool else None,
         "party_size": party_size if type(party_size) is int else None,
     }

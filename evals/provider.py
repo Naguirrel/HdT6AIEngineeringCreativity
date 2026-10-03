@@ -28,9 +28,14 @@ async def call_api(prompt, options, context):
         weather_service = make_weather_service(weather_fixture)
         calendar_fixture = variables.get("calendar_fixture", "empty")
         calendar_service = make_calendar_service(calendar_fixture)
+        expected_identity = {
+            field: variables[key]
+            for key, field in (("expect_customer_name", "customer_name"), ("expect_contact", "contact"))
+            if key in variables
+        }
         result = await run_centralized_session_async(
             turns, fixed_today=fixed_today, weather_service=weather_service,
-            calendar_service=calendar_service,
+            calendar_service=calendar_service, expected_identity=expected_identity,
         )
     except ConfigError as error:
         return {"error": f"Configuracion: {error}"}
@@ -51,6 +56,7 @@ async def call_api(prompt, options, context):
             "weather_requests": result.weather_requests,
             "real_open_meteo_contacted": False,
             "confirmed_tandem_date": result.confirmed_tandem_date,
+            "identity_checks": result.identity_checks,
         },
         "latencyMs": result.latency_ms,
     }

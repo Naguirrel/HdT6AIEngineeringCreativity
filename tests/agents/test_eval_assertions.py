@@ -42,21 +42,14 @@ def test_tool_assertion_checks_counts_and_order():
     assert get_assert("ok", _context(events[::-1], **variables))["pass"] is False
 
 
-def test_tool_assertion_checks_arguments_results_status_and_hashed_identity():
-    import hashlib
-
+def test_tool_assertion_checks_arguments_results_status_and_identity_booleans():
     day = {"date_str": "2026-09-20"}
     events = [{"tool": "check_jump_day", "status": "success", "arguments": day}, {
         "tool": "check_appointment_availability", "status": "success", "arguments": day,
         "result": {"available": True},
     }, {
         "tool": "create_appointment",
-        "arguments": {
-            "date_str": "2026-09-20",
-            "party_size": 2,
-            "customer_name_sha256": hashlib.sha256(b"Ana Ejemplo").hexdigest(),
-            "contact_sha256": hashlib.sha256(b"ana@example.invalid").hexdigest(),
-        },
+        "arguments": {"date_str": "2026-09-20", "party_size": 2},
         "result": {"created": True},
         "status": "success",
     }]
@@ -66,8 +59,13 @@ def test_tool_assertion_checks_arguments_results_status_and_hashed_identity():
         "expect_tool_events": [{"tool": "create_appointment", "arguments": {"party_size": 2},
                                 "result": {"created": True}, "status": "success"}],
     }
-    assert get_assert("ok", _context(events, **variables))["pass"] is True
-    assert get_assert("ok", _context(events, **{**variables, "expect_contact": "wrong"}))["pass"] is False
+    context = _context(events, **variables)
+    context["metadata"]["identity_checks"] = {"customer_name": True, "contact": True}
+    assert get_assert("ok", context)["pass"] is True
+    context["metadata"]["identity_checks"] = {"customer_name": True, "contact": False}
+    assert get_assert("ok", context)["pass"] is False
+    context["metadata"].pop("identity_checks")
+    assert get_assert("ok", context)["pass"] is False  # fails closed without the in-process check
     assert get_assert("ok", _context(events, expect_tool_events=[{"tool": "create_appointment",
                                                                   "result": {"created": False}}]))["pass"] is False
 
