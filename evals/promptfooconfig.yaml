@@ -1,6 +1,9 @@
 description: Parachute S.A. centralized supervisor evaluations
 env:
   REQUEST_TIMEOUT_MS: 45000
+# One case at a time: the provider and grader share the LLM quota.
+evaluateOptions:
+  maxConcurrency: 1
 prompts:
   - '{{ turns }}'
 providers:
