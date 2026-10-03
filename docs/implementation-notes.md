@@ -1,5 +1,8 @@
 # Notas de implementacion (auditoria Fase 0)
 
+> Documento historico de HDT5. Las cifras (por ejemplo, 73 tests) corresponden a
+> esa etapa. El estado actual de HDT6 esta en `README.md` y `AGENTS.md`.
+
 ## Estado inicial del repositorio
 
 Este repositorio (`HDT5-Orquestaci-n`) estaba vacio (solo `README.md` y un

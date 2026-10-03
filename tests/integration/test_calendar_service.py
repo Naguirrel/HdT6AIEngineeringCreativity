@@ -44,7 +44,7 @@ def test_check_availability_true_when_no_bookings():
 
 def test_create_appointment_succeeds_for_ideal_assessment():
     service = InMemoryCalendarService()
-    record = service.create_appointment(make_data(), make_assessment(Decision.IDEAL))
+    record = service.create_appointment(make_data(), make_assessment(Decision.IDEAL)).record
     assert record.data.customer_name == "Juan Perez"
     assert record.assessment.decision == Decision.IDEAL
 
@@ -68,7 +68,7 @@ def test_create_appointment_succeeds_for_marginal_with_experienced_tandem():
     service = InMemoryCalendarService()
     record = service.create_appointment(
         make_data(is_experienced_tandem=True), make_assessment(Decision.MARGINAL)
-    )
+    ).record
     assert record.assessment.decision == Decision.MARGINAL
 
 
@@ -82,17 +82,17 @@ def test_create_appointment_rejects_mismatched_assessment_date():
 def test_create_appointment_is_idempotent_for_same_customer_and_date():
     service = InMemoryCalendarService()
     assessment = make_assessment(Decision.IDEAL)
-    first = service.create_appointment(make_data(), assessment)
+    first = service.create_appointment(make_data(), assessment).record
     second = service.create_appointment(make_data(), assessment)
-    assert first.id == second.id
+    assert second.created is False and first.id == second.record.id
 
 
 def test_create_appointment_fails_when_no_slots_left():
     service = InMemoryCalendarService(max_slots_per_day=1)
     assessment = make_assessment(Decision.IDEAL)
-    service.create_appointment(make_data(customer_name="Cliente Uno"), assessment)
+    service.create_appointment(make_data(customer_name="Cliente Uno", contact="uno@example.com"), assessment)
     with pytest.raises(CalendarServiceError):
-        service.create_appointment(make_data(customer_name="Cliente Dos"), assessment)
+        service.create_appointment(make_data(customer_name="Cliente Dos", contact="dos@example.com"), assessment)
 
 
 @pytest.mark.parametrize(
@@ -125,6 +125,6 @@ def test_invalid_appointment_data_is_rejected_without_using_capacity(overrides):
 
 
 def test_appointment_data_accepts_boundary_lengths_and_minimum_party_size():
-    data = make_data(customer_name="A" * 200, contact="c" * 254, party_size=1)
-    record = InMemoryCalendarService().create_appointment(data, make_assessment(Decision.IDEAL))
+    data = make_data(customer_name="A" * 200, contact="c" * 240 + "@example.com", party_size=1)
+    record = InMemoryCalendarService().create_appointment(data, make_assessment(Decision.IDEAL)).record
     assert record.data == data

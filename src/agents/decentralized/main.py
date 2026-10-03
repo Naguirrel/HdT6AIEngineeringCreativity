@@ -11,13 +11,15 @@ poder crear una cita, sin importar por que ruta de handoffs se llego ahi.
 
 import sys
 
-from agents import Agent, RunContextWrapper, handoff
+from agents import Agent, Model, RunContextWrapper, handoff
 from pydantic import BaseModel
 
 from src.agents.common.bootstrap import build_context
+from src.agents.common.booking_completion import booking_result_or_continue
 from src.agents.common.cli import run_chat
 from src.agents.common.context import ParachuteContext
 from src.agents.common.model_client import build_model
+from src.agents.common.policies import BOOKING_RULES, ENTRY_AGENT_RULES, TRUTHFUL_OUTPUT_RULES, compose
 from src.agents.common.specialist_agents import (
     FAQ_INSTRUCTIONS,
     SCHEDULING_INSTRUCTIONS,
@@ -41,21 +43,28 @@ class HandoffReason(BaseModel):
 def _log_handoff_reason(wrapper: RunContextWrapper[ParachuteContext], data: HandoffReason) -> None:
     log_event(architecture=wrapper.context.architecture, handoff_reason_present=bool(data.reason))
 
-FAQ_DECENTRALIZED_INSTRUCTIONS = (
-    FAQ_INSTRUCTIONS
-    + "\nSi detectas intencion de reservar una cita o de conocer el clima de un dia, "
-    "transfiere la conversacion al Weather Agent."
+# The FAQ Agent is the entry point here, so it carries the same entry rules as the
+# centralized supervisor and the hierarchical Root Manager.
+FAQ_DECENTRALIZED_INSTRUCTIONS = compose(
+    FAQ_INSTRUCTIONS,
+    "Si detectas intencion de reservar una cita o de conocer el clima de un dia, "
+    "transfiere la conversacion al Weather Agent.",
+    ENTRY_AGENT_RULES,
 )
-WEATHER_DECENTRALIZED_INSTRUCTIONS = (
-    WEATHER_INSTRUCTIONS
-    + "\nSi el resultado no es PROHIBITED y el usuario quiere continuar con la reserva, "
+WEATHER_DECENTRALIZED_INSTRUCTIONS = compose(
+    WEATHER_INSTRUCTIONS,
+    "Si el resultado no es PROHIBITED y el usuario quiere continuar con la reserva, "
     "transfiere la conversacion al Scheduling Agent. Si es PROHIBITED, responde tu mismo "
-    "sin transferir a creacion de citas."
+    "sin transferir a creacion de citas.",
+    BOOKING_RULES,
+    TRUTHFUL_OUTPUT_RULES,
 )
-SCHEDULING_DECENTRALIZED_INSTRUCTIONS = (
-    SCHEDULING_INSTRUCTIONS
-    + "\nSi durante la conversacion aparece una pregunta de conocimiento no relacionada con "
-    "la cita, transfiere de vuelta al FAQ Agent."
+SCHEDULING_DECENTRALIZED_INSTRUCTIONS = compose(
+    SCHEDULING_INSTRUCTIONS,
+    "Si durante la conversacion aparece una pregunta de conocimiento no relacionada con "
+    "la cita, transfiere de vuelta al FAQ Agent.",
+    BOOKING_RULES,
+    TRUTHFUL_OUTPUT_RULES,
 )
 
 
@@ -79,6 +88,7 @@ def build_decentralized_agents(model) -> tuple[Agent, Agent, Agent]:
         handoff_description="Verifica disponibilidad y crea la cita de salto.",
         instructions=SCHEDULING_DECENTRALIZED_INSTRUCTIONS,
         tools=[check_appointment_availability, create_appointment],
+        tool_use_behavior=booking_result_or_continue,
         model=model,
     )
 
@@ -92,10 +102,10 @@ def build_decentralized_agents(model) -> tuple[Agent, Agent, Agent]:
     return faq_agent, weather_agent, scheduling_agent
 
 
-def build_entry_agent() -> tuple[Agent, ParachuteContext]:
+def build_entry_agent(model: Model | None = None) -> tuple[Agent, ParachuteContext]:
     config = load_config()
     context = build_context(config, architecture="decentralized")
-    model = build_model(config)
+    model = model or build_model(config)
 
     faq_agent, _weather_agent, _scheduling_agent = build_decentralized_agents(model)
     return faq_agent, context

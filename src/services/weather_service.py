@@ -7,6 +7,7 @@ from src.domain.date_policy import validate_forecast_date
 from src.domain.weather_models import JumpAssessment
 from src.domain.weather_policy import assess_jump_conditions
 from src.integrations.open_meteo import OpenMeteoClient, OpenMeteoError
+from src.observability import log_event
 
 
 class WeatherServiceError(RuntimeError):
@@ -31,6 +32,9 @@ class WeatherService:
         try:
             weather = self.client.get_weather(requested_date)
         except OpenMeteoError as error:
-            raise WeatherServiceError(f"No fue posible obtener el pronostico: {error}") from error
+            log_event(component="weather_service", weather_check_result="provider_error", error_type=type(error).__name__)
+            raise WeatherServiceError(
+                "No fue posible obtener el pronostico meteorologico en este momento. Intenta mas tarde."
+            ) from error
 
         return assess_jump_conditions(weather)

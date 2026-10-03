@@ -9,12 +9,16 @@ jump_assessment, handoff/delegation, calendar_write_attempt/result.
 import logging
 import sys
 
-from agents import set_tracing_disabled
-
 logger = logging.getLogger("parachute")
+
+GENERIC_USER_ERROR = "Ocurrio un error al procesar tu mensaje. Intenta de nuevo en unos momentos."
 
 
 def configure_logging(level: int = logging.INFO) -> None:
+    from agents import set_tracing_disabled
+
+    # Remote export of SDK traces is always off: they would include prompts and tool data.
+    set_tracing_disabled(True)
     if logger.handlers:
         return
     handler = logging.StreamHandler(stream=sys.stderr)
@@ -22,10 +26,15 @@ def configure_logging(level: int = logging.INFO) -> None:
     logger.addHandler(handler)
     logger.setLevel(level)
     logger.propagate = False
-    set_tracing_disabled(True)
 
 
 def log_event(**fields) -> None:
     """Emite un evento como pares clave=valor en una sola linea (facil de grep/parsear)."""
     rendered = " ".join(f"{key}={value}" for key, value in fields.items() if value is not None)
     logger.info(rendered)
+
+
+def user_facing_error(error: BaseException, **fields) -> str:
+    """Log only the error type locally and return a generic message for the user."""
+    log_event(error_type=type(error).__name__, **fields)
+    return GENERIC_USER_ERROR

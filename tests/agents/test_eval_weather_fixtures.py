@@ -39,8 +39,9 @@ def test_fixture_error_and_unknown_name():
 
     with pytest.raises(FixtureError):
         make_weather_service("missing")
-    with pytest.raises(WeatherServiceError, match="simulado"):
+    with pytest.raises(WeatherServiceError, match="No fue posible obtener el pronostico") as raised:
         make_weather_service("error").check_jump_day(VALID_DATE, TODAY)
+    assert "simulado" in str(raised.value.__cause__)  # detail kept only in the exception chain
 
 
 def test_clock_horizon_and_no_network_for_invalid_date():
@@ -72,3 +73,35 @@ def test_each_service_has_independent_call_history():
     second = make_weather_service("ideal")
     first.check_jump_day(VALID_DATE, TODAY)
     assert second.client.calls == []
+
+
+def test_calendar_fixtures_preload_participants_and_reject_unknown_names():
+    from evals.fixtures.calendar import make_calendar_service
+
+    assert make_calendar_service("empty").booked_participants(VALID_DATE) == 0
+    full = make_calendar_service("full_2026_09_20")
+    assert full.booked_participants(VALID_DATE) == 8
+    assert full.check_availability(VALID_DATE, 1) is False
+    assert make_calendar_service("nearly_full_2026_09_20").check_availability(VALID_DATE, 1) is True
+    assert make_calendar_service("full_2026_09_20") is not full  # fresh calendar per case
+    with pytest.raises(FixtureError):
+        make_calendar_service("missing")
+
+
+@pytest.mark.asyncio
+async def test_provider_uses_the_requested_calendar_fixture(monkeypatch):
+    from evals import provider
+    from src.agents.centralized.evaluation import EvaluationResult
+
+    seen = {}
+
+    async def fake_session(turns, **kwargs):
+        seen["calendar"] = kwargs["calendar_service"]
+        return EvaluationResult("respuesta", [], [], 1)
+
+    monkeypatch.setattr(provider, "run_centralized_session_async", fake_session)
+    response = await provider.call_api("x", {}, {"vars": {"turns": ["hola"], "calendar_fixture": "full_2026_09_20"}})
+    assert response["metadata"]["calendar_fixture"] == "full_2026_09_20"
+    assert seen["calendar"].booked_participants(VALID_DATE) == 8
+    error = await provider.call_api("x", {}, {"vars": {"turns": ["hola"], "calendar_fixture": "nope"}})
+    assert "error" in error

@@ -2,8 +2,9 @@
 para cada arquitectura y deja evidencia en docs/smoke-test-output.txt.
 
 No forma parte de la suite automatizada porque depende de red y de un LLM real
-(no deterministico); es la verificacion end-to-end pedida en la seccion 17 del
-plan, corrida una vez para recolectar evidencia real de comportamiento.
+(no deterministico). Usa la misma ruta que la CLI y la evaluacion: reloj de
+Guatemala, observe_user_message y finish_turn (finalizacion determinista, guarda de
+veracidad y grounding), y cierra el cliente del modelo de cada arquitectura.
 """
 
 import asyncio
@@ -11,56 +12,67 @@ import sys
 from datetime import date, timedelta
 
 from agents import Runner
+from openai import AsyncOpenAI
 
 from src.agents.centralized.main import build_supervisor
+from src.agents.common.booking_completion import finish_turn
 from src.agents.decentralized.main import build_entry_agent
 from src.agents.hierarchical.main import build_root_manager
-from src.observability import configure_logging
-
-VALID_DATE = (date.today() + timedelta(days=3)).isoformat()
-OUT_OF_RANGE_DATE = (date.today() + timedelta(days=200)).isoformat()
-
-SCRIPT = [
-    "¿Cuál es la edad mínima para poder saltar?",
-    f"Quiero saltar el {VALID_DATE}, ¿se puede? Si es posible resérvame, mi nombre es Ana Lopez y mi contacto es ana@example.com.",
-    f"¿Puedo reservar para el {OUT_OF_RANGE_DATE}?",
-]
+from src.domain.clock import current_guatemala_date
+from src.observability import configure_logging, user_facing_error
 
 
-async def run_architecture(name: str, starting_agent, context) -> list[str]:
+def build_script(today: date) -> list[str]:
+    valid_date = (today + timedelta(days=3)).isoformat()
+    out_of_range_date = (today + timedelta(days=200)).isoformat()
+    return [
+        "¿Cuál es la edad mínima para poder saltar?",
+        f"Quiero saltar el {valid_date}. Resérvame a nombre de Ana Lopez, contacto ana@example.com.",
+        f"¿Puedo reservar para el {out_of_range_date}?",
+    ]
+
+
+async def run_architecture(name: str, starting_agent, context, script: list[str], run=Runner.run) -> list[str]:
     lines = [f"=== {name} ==="]
     current_agent = starting_agent
     history: list[dict] = []
-    for turn in SCRIPT:
+    for turn in script:
         context.observe_user_message(turn)
         history.append({"role": "user", "content": turn})
         lines.append(f"Usuario: {turn}")
         try:
-            result = await Runner.run(current_agent, history, context=context)
+            result = await run(current_agent, history, context=context)
         except Exception as error:
-            lines.append(f"[ERROR] {error}")
+            lines.append(f"[ERROR] {user_facing_error(error, architecture=name, stage='smoke')}")
             continue
-        lines.append(f"[{result.last_agent.name}]: {result.final_output}")
+        lines.append(f"[{result.last_agent.name}]: {finish_turn(context, result.final_output)}")
         history = result.to_input_list()
         current_agent = result.last_agent
     lines.append("")
     return lines
 
 
+async def close_model_client(agent) -> None:
+    client = getattr(getattr(agent, "model", None), "_client", None)
+    if isinstance(client, AsyncOpenAI):
+        await client.close()
+
+
 async def main() -> None:
     configure_logging()
-
-    supervisor, ctx1 = build_supervisor()
-    root_manager, ctx2 = build_root_manager()
-    entry_agent, ctx3 = build_entry_agent()
+    script = build_script(current_guatemala_date())
 
     all_lines: list[str] = []
-    for name, agent, context in (
-        ("centralized", supervisor, ctx1),
-        ("hierarchical", root_manager, ctx2),
-        ("decentralized", entry_agent, ctx3),
+    for name, build in (
+        ("centralized", build_supervisor),
+        ("hierarchical", build_root_manager),
+        ("decentralized", build_entry_agent),
     ):
-        all_lines.extend(await run_architecture(name, agent, context))
+        agent, context = build()
+        try:
+            all_lines.extend(await run_architecture(name, agent, context, script))
+        finally:
+            await close_model_client(agent)
 
     output = "\n".join(all_lines)
     print(output)

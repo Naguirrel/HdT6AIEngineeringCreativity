@@ -5,7 +5,8 @@ import asyncio
 from agents import Agent, Runner
 
 from src.agents.common.context import ParachuteContext
-from src.observability import log_event
+from src.agents.common.booking_completion import finish_turn
+from src.observability import log_event, user_facing_error
 
 
 async def run_chat_async(starting_agent: Agent, context: ParachuteContext, architecture_name: str) -> None:
@@ -35,7 +36,7 @@ async def run_chat_async(starting_agent: Agent, context: ParachuteContext, archi
         try:
             result = await Runner.run(current_agent, history, context=context)
         except Exception as error:
-            print(f"Ocurrio un error al procesar tu mensaje: {error}")
+            print(user_facing_error(error, architecture=architecture_name, stage="runner"))
             continue
 
         if result.last_agent.name != current_agent.name:
@@ -44,7 +45,7 @@ async def run_chat_async(starting_agent: Agent, context: ParachuteContext, archi
                 handoff=f"{current_agent.name}->{result.last_agent.name}",
             )
 
-        print(f"[{result.last_agent.name}]: {result.final_output}\n")
+        print(f"[{result.last_agent.name}]: {finish_turn(context, result.final_output)}\n")
         history = result.to_input_list()
         current_agent = result.last_agent
 
