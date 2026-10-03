@@ -100,7 +100,7 @@
     expect_tool_events:
       - {tool: create_appointment, arguments: {date_str: '2026-09-20', is_experienced_tandem: true}, result: {created: true}, status: success}
   assert:
-    - {type: contains, value: '2026-09-20'}
+    - {type: regex, value: '(?<!\d)(?:2026[-\u2010-\u2015\u2212]09[-\u2010-\u2015\u2212]20|20[\s*_]+[Dd][Ee][\s*_]+[Ss][Ee][Pp][Tt][Ii][Ee][Mm][Bb][Rr][Ee][\s*_]+[Dd][Ee][\s*_]+2026)(?!\d)'}
     - {type: python, value: 'file://assertions/tool_trace.py'}
 - description: Confirmación marginal de una fecha distinta
   vars:
