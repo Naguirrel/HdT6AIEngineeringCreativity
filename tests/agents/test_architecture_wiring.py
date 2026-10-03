@@ -10,7 +10,7 @@ from src.agents.centralized.main import build_supervisor
 from src.agents.common.booking_completion import booking_result_or_continue
 from src.agents.common.model_client import build_model
 from src.agents.common.specialist_agents import build_faq_agent, build_scheduling_agent
-from src.agents.decentralized.main import build_decentralized_agents
+from src.agents.decentralized.main import build_decentralized_agents, build_entry_agent
 from src.agents.hierarchical.main import build_root_manager
 from src.config import load_config
 
@@ -30,27 +30,20 @@ def test_centralized_supervisor_exposes_three_specialists_as_tools():
     assert supervisor.tool_use_behavior is booking_result_or_continue
 
 
-def test_centralized_supervisor_instructions_enforce_domain_boundary():
-    supervisor, _context = build_supervisor()
-    instructions = " ".join(supervisor.instructions.casefold().split())
-    assert "fuera de ese dominio" in instructions
-    assert "no respondas con conocimiento general" in instructions
-    assert "solo puedes ayudar con parachute s.a., sus faqs o citas" in instructions
-    assert "saludos, despedidas y preguntas claramente fuera del dominio" in instructions
-    assert "no invoques faq_specialist, weather_specialist ni scheduling_specialist" in instructions
-    assert "delega siempre a faq_specialist antes de responder" in instructions
-    assert "no respondas con memoria propia" in instructions
-    assert "copia fielmente los datos exactos" in instructions
-    assert "si el especialista no encuentra el dato solicitado" in instructions
-    assert "prioriza el grupo indicado por el usuario" in instructions
-    assert "no presentes la regla general como requisito absoluto" in instructions
-    assert "las solicitudes de cita son parte de tu dominio" in instructions
-    assert "nunca respondas a una reserva con la negativa" in instructions
-    assert "check_jump_day, check_appointment_availability y create_appointment" in instructions
-    assert "si create_appointment confirma la cita, comunica fielmente el resultado y su fecha" in instructions
-    assert {tool.name for tool in supervisor.tools} == {
-        "faq_specialist", "weather_specialist", "scheduling_specialist"
-    }
+def test_all_entry_agents_share_the_same_critical_rules():
+    """Behavior is covered by test_architecture_flows; here we check the single shared source."""
+    from src.agents.common.policies import BOOKING_RULES, ENTRY_AGENT_RULES, TRUTHFUL_OUTPUT_RULES
+
+    supervisor, _ = build_supervisor()
+    root_manager, _ = build_root_manager()
+    entry_agent, _ = build_entry_agent()
+    for agent in (supervisor, root_manager, entry_agent):
+        assert ENTRY_AGENT_RULES in agent.instructions
+    booking_manager = next(tool for tool in root_manager.tools if tool.name == "booking_manager")
+    assert booking_manager is not None
+    _faq, weather, scheduling = build_decentralized_agents(build_model(load_config()))
+    for agent in (weather, scheduling):
+        assert BOOKING_RULES in agent.instructions and TRUTHFUL_OUTPUT_RULES in agent.instructions
 
 
 def test_faq_specialist_grounding_contract():
