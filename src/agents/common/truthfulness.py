@@ -22,7 +22,8 @@ _HEDGE = re.compile(
     r"antes de|cuando|una vez|si|quedar[aá]|podr[aá]|podemos|puedo|deseas|quieres|confirma(?:s|r)?|"
     r"confirme(?:s)?|intent\w*|error|imposible|rechaz\w*)\b"
 )
-_SENTENCE = re.compile(r"[^.!?\n]+[.!?]*\n?|\n")
+# A sentence ends at . ! ? followed by whitespace (not inside "28.1") or at a line break.
+_SENTENCE = re.compile(r".+?(?:[.!?](?=\s|$)\s*|\n|$)", re.S)
 
 
 def is_booking_claim(sentence: str) -> bool:

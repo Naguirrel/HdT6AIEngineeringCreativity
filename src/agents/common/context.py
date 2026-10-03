@@ -8,6 +8,7 @@ el run, sin depender de que el LLM recuerde datos en texto libre.
 from dataclasses import dataclass, field
 from copy import deepcopy
 from datetime import date
+import functools
 import re
 from typing import Callable
 
@@ -18,6 +19,18 @@ from src.domain.weather_models import JumpAssessment
 from src.services.calendar_service import CalendarService
 from src.services.faq_service import FaqService
 from src.services.weather_service import WeatherService
+
+
+def records_output(tool_function):
+    """Keep each business tool's text output as a trusted source for this turn's answer."""
+
+    @functools.wraps(tool_function)
+    def wrapper(context, *args, **kwargs):
+        output = tool_function(context, *args, **kwargs)
+        context.turn_tool_outputs.append(output)
+        return output
+
+    return wrapper
 
 
 @dataclass
@@ -66,12 +79,16 @@ class ParachuteContext:
     appointments: list[AppointmentRecord] = field(default_factory=list)
     retrieved_context: list[dict[str, str]] = field(default_factory=list)
     turn_faq_entries: list[dict[str, str]] = field(default_factory=list)
+    turn_tool_outputs: list[str] = field(default_factory=list)
+    turn_tools: list[str] = field(default_factory=list)
+    user_messages: list[str] = field(default_factory=list)
     last_user_message: str = ""
     _tool_trace: list[dict] = field(default_factory=list, repr=False)
 
     def record_tool_event(self, tool: str, arguments: dict, result: dict, status: str) -> None:
         if status not in {"success", "error"}:
             raise ValueError("El estado de la herramienta debe ser success o error.")
+        self.turn_tools.append(tool)
         self._tool_trace.append({
             "sequence": len(self._tool_trace) + 1,
             "tool": tool,
@@ -161,7 +178,10 @@ class ParachuteContext:
         """Start a turn: keep user-provided data and handle date changes and tandem replies."""
         self.appointment_confirmation = None
         self.turn_faq_entries = []
+        self.turn_tool_outputs = []
+        self.turn_tools = []
         self.last_user_message = message
+        self.user_messages.append(message)
 
         details = extract_booking_details(message, self.today())
         single_date = details.dates[0] if len(set(details.dates)) == 1 else None

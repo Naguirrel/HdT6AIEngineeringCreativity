@@ -8,6 +8,7 @@ the user's data are all in place, the booking is completed with the real busines
 from agents import FunctionToolResult, RunContextWrapper, ToolsToFinalOutputResult
 
 from src.agents.common.context import ParachuteContext
+from src.agents.common.grounding import ground_answer
 from src.agents.common.truthfulness import enforce_truthful_booking_claims
 from src.tools.calendar_tools import book_appointment, evaluate_availability
 
@@ -66,4 +67,4 @@ def finish_turn(context: ParachuteContext, model_output: object) -> str:
     if context.appointment_confirmation:
         return context.appointment_confirmation
     text = model_output if isinstance(model_output, str) else ""
-    return enforce_truthful_booking_claims(context, text)
+    return enforce_truthful_booking_claims(context, ground_answer(context, text))

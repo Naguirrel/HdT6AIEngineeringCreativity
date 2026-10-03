@@ -7,7 +7,7 @@ al contexto de la conversacion.
 
 from agents import RunContextWrapper, function_tool
 
-from src.agents.common.context import ParachuteContext
+from src.agents.common.context import ParachuteContext, records_output
 from src.domain.dates import normalized_date_or_none, parse_date_argument
 from src.domain.weather_models import Decision
 from src.observability import log_event
@@ -33,6 +33,7 @@ def _format_assessment(assessment) -> str:
     return "\n".join(lines)
 
 
+@records_output
 def evaluate_jump_day(context: ParachuteContext, date_str: str) -> str:
     """Logica del tool check_jump_day, invocable directamente en tests."""
     previous_date = context.requested_date

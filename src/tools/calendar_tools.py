@@ -9,7 +9,7 @@ import hashlib
 
 from agents import RunContextWrapper, function_tool
 
-from src.agents.common.context import ParachuteContext
+from src.agents.common.context import ParachuteContext, records_output
 from src.domain.appointment_models import AppointmentData, AppointmentRecord
 from src.domain.dates import normalized_date_or_none, parse_date_argument
 from src.domain.weather_models import Decision
@@ -24,6 +24,7 @@ def _requested_party_size(context: ParachuteContext, party_size: int | None) -> 
     return party_size
 
 
+@records_output
 def evaluate_availability(context: ParachuteContext, date_str: str, party_size: int | None = None) -> str:
     context.availability_approved_date = None
     party_size = _requested_party_size(context, party_size)
@@ -78,6 +79,7 @@ def format_confirmation(record: AppointmentRecord) -> str:
     )
 
 
+@records_output
 def book_appointment(
     context: ParachuteContext,
     date_str: str,

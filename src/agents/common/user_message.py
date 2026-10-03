@@ -111,6 +111,30 @@ def extract_dates(text: str, today: date | None = None) -> tuple[list[date], boo
     return found, ambiguous
 
 
+def date_mentions(text: str) -> list[tuple[int | None, int, int]]:
+    """(year or None, month, day) for every explicit date, without guessing missing years."""
+    normalized = normalize_text(text)
+    mentions: list[tuple[int | None, int, int]] = []
+    for match in _ISO_DATE.finditer(normalized):
+        mentions.append((int(match.group(1)), int(match.group(2)), int(match.group(3))))
+    remaining = _ISO_DATE.sub(" ", normalized)
+    for match in _DMY_DATE.finditer(remaining):
+        mentions.append((int(match.group(3)), int(match.group(2)), int(match.group(1))))
+    remaining = _DMY_DATE.sub(" ", remaining)
+    for match in _TEXT_DATE.finditer(remaining):
+        year = int(match.group(3)) if match.group(3) else None
+        mentions.append((year, _MONTHS[match.group(2)], int(match.group(1))))
+    return mentions
+
+
+def strip_dates(text: str) -> str:
+    """Normalized text with explicit dates removed (so their digits are not read as numbers)."""
+    normalized = normalize_text(text)
+    for pattern in (_ISO_DATE, _DMY_DATE, _TEXT_DATE):
+        normalized = pattern.sub(" ", normalized)
+    return normalized
+
+
 @dataclass(frozen=True)
 class MessageDetails:
     dates: tuple[date, ...] = ()
