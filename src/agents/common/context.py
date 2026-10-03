@@ -9,10 +9,10 @@ from dataclasses import dataclass, field
 from copy import deepcopy
 from datetime import date
 import re
-import unicodedata
 from typing import Callable
 
-from src.domain.appointment_models import AppointmentData, AppointmentRecord
+from src.agents.common.user_message import extract_booking_details, normalize_text
+from src.domain.appointment_models import AppointmentRecord
 from src.domain.clock import current_guatemala_date
 from src.domain.weather_models import JumpAssessment
 from src.services.calendar_service import CalendarService
@@ -28,6 +28,28 @@ class SharedServices:
 
 
 @dataclass
+class BookingRequest:
+    """Datos de reserva aportados por el usuario; se conservan entre turnos y as_tool()."""
+
+    jump_date: date | None = None
+    customer_name: str | None = None
+    contact: str | None = None
+    party_size: int | None = None
+    requested: bool = False
+    blocked_reason: str | None = None
+
+    def missing_fields(self) -> list[str]:
+        missing = []
+        if self.jump_date is None:
+            missing.append("fecha")
+        if not self.customer_name:
+            missing.append("nombre")
+        if not self.contact:
+            missing.append("contacto")
+        return missing
+
+
+@dataclass
 class ParachuteContext:
     services: SharedServices
     architecture: str = "unknown"
@@ -36,11 +58,15 @@ class ParachuteContext:
     jump_assessment: JumpAssessment | None = None
     assessment_checked_on: date | None = None
     availability_approved_date: date | None = None
-    appointment_data: AppointmentData | None = None
+    appointment_data: object | None = None
     appointment_record: AppointmentRecord | None = None
     appointment_confirmation: str | None = None
     confirmed_tandem_date: date | None = None
+    booking_request: BookingRequest = field(default_factory=BookingRequest)
+    appointments: list[AppointmentRecord] = field(default_factory=list)
     retrieved_context: list[dict[str, str]] = field(default_factory=list)
+    turn_faq_entries: list[dict[str, str]] = field(default_factory=list)
+    last_user_message: str = ""
     _tool_trace: list[dict] = field(default_factory=list, repr=False)
 
     def record_tool_event(self, tool: str, arguments: dict, result: dict, status: str) -> None:
@@ -60,6 +86,10 @@ class ParachuteContext:
 
     def get_retrieved_context(self) -> list[dict[str, str]]:
         return deepcopy(self.retrieved_context)
+
+    def record_faq_entries(self, entries: list[dict[str, str]]) -> None:
+        self.retrieved_context.extend(deepcopy(entries))
+        self.turn_faq_entries.extend(deepcopy(entries))
 
     def has_current_booking_approvals(self, requested_date: date) -> bool:
         """Require matching, ordered approvals in this session's business trace."""
@@ -92,17 +122,56 @@ class ParachuteContext:
             and weather_event["sequence"] < availability_event["sequence"]
         )
 
+    def remember_booking_details(
+        self,
+        *,
+        jump_date: date | None = None,
+        customer_name: str | None = None,
+        contact: str | None = None,
+        party_size: int | None = None,
+        requested: bool = False,
+    ) -> None:
+        request = self.booking_request
+        changed = False
+        for name, value in (
+            ("jump_date", jump_date), ("customer_name", customer_name),
+            ("contact", contact), ("party_size", party_size),
+        ):
+            if value is not None and getattr(request, name) != value:
+                setattr(request, name, value)
+                changed = True
+        if requested:
+            request.requested = True
+        if changed:
+            request.blocked_reason = None
+
+    def booking_already_recorded(self) -> bool:
+        request = self.booking_request
+        return any(
+            record.data.jump_date == request.jump_date
+            and normalize_text(record.data.contact) == normalize_text(request.contact or "")
+            for record in self.appointments
+        )
+
     def observe_user_message(self, message: str) -> None:
-        """Record an explicit user confirmation for the currently assessed marginal day."""
+        """Start a turn: keep user-provided data and handle date changes and tandem replies."""
         self.appointment_confirmation = None
+        self.turn_faq_entries = []
+        self.last_user_message = message
+
+        details = extract_booking_details(message)
+        single_date = details.dates[0] if len(set(details.dates)) == 1 else None
+        self.remember_booking_details(
+            jump_date=single_date,
+            customer_name=details.customer_name,
+            contact=details.contact,
+            party_size=details.party_size,
+            requested=details.booking_intent,
+        )
+
         if self.requested_date is None or self.jump_assessment is None:
             return
-
-        normalized = unicodedata.normalize("NFKD", message.casefold())
-        normalized = "".join(char for char in normalized if not unicodedata.combining(char))
-        normalized = re.sub(r"[\u2010-\u2015\u2212]", "-", normalized)
-        dates = re.findall(r"\b\d{4}-\d{2}-\d{2}\b", normalized)
-        if dates and any(value != self.requested_date.isoformat() for value in dates):
+        if any(value != self.requested_date for value in details.dates):
             self.requested_date = None
             self.jump_assessment = None
             self.assessment_checked_on = None
@@ -111,10 +180,18 @@ class ParachuteContext:
             return
         if not self.jump_assessment.requires_experienced_tandem:
             return
-        if "?" in normalized or re.search(r"\b(no|nunca|rechazo|sin)\b", normalized):
+
+        normalized = normalize_text(message)
+        if re.search(r"\b(?:no\s+(?:acepto|confirmo|quiero|deseo|estoy)|rechazo|nunca|prefiero no)\b", normalized) \
+                or re.search(r"\bsin\s+(?:el\s+)?tandem\b", normalized):
             self.confirmed_tandem_date = None
             self.availability_approved_date = None
             return
-        accepts = re.match(r"^\s*(?:si[,\s]+)?(?:acepto|confirmo|estoy de acuerdo)\b", normalized)
-        if accepts and "tandem" in normalized and "experimentado" in normalized:
+        if "?" in normalized or details.ambiguous_date:
+            return
+        accepts = re.match(
+            r"^\s*(?:(?:si|ok|vale|claro|perfecto|listo|de acuerdo)[,.!\s]+)*(?:acepto|confirmo|estoy de acuerdo)\b",
+            normalized,
+        )
+        if accepts and "tandem" in normalized and re.search(r"\bexperimentad[oa]s?\b", normalized):
             self.confirmed_tandem_date = self.requested_date

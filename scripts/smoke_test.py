@@ -13,6 +13,7 @@ from datetime import date, timedelta
 from agents import Runner
 
 from src.agents.centralized.main import build_supervisor
+from src.agents.common.booking_completion import finish_turn
 from src.agents.decentralized.main import build_entry_agent
 from src.agents.hierarchical.main import build_root_manager
 from src.observability import configure_logging
@@ -40,7 +41,7 @@ async def run_architecture(name: str, starting_agent, context) -> list[str]:
         except Exception as error:
             lines.append(f"[ERROR] {error}")
             continue
-        lines.append(f"[{result.last_agent.name}]: {result.final_output}")
+        lines.append(f"[{result.last_agent.name}]: {finish_turn(context, result.final_output)}")
         history = result.to_input_list()
         current_agent = result.last_agent
     lines.append("")

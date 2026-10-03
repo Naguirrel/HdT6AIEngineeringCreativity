@@ -45,7 +45,11 @@ confirmar la cita, solicitando al usuario nombre,
 contacto y, si la evaluacion fue MARGINAL, confirmacion explicita de que acepta
 un salto tandem con instructor experimentado. Pide al usuario que escriba una
 confirmacion como 'Acepto tandem experimentado' antes de crear la cita; el
-booleano de la herramienta no sustituye esa confirmacion."""
+booleano de la herramienta no sustituye esa confirmacion. Los datos que el
+usuario ya proporciono quedan guardados en la sesion: si no los recibes en tu
+entrada, llama create_appointment solo con date_str y la herramienta los usara;
+no vuelvas a pedirlos. Nunca afirmes que una cita existe sin que
+create_appointment lo haya confirmado."""
 
 
 def build_faq_agent(model: Model, handoffs: list[Handoff | Agent] | None = None) -> Agent:

@@ -42,14 +42,16 @@ def _format_assessment(assessment) -> str:
 
 def evaluate_jump_day(context: ParachuteContext, date_str: str) -> str:
     """Logica del tool check_jump_day, invocable directamente en tests."""
+    previous_date = context.requested_date
+    previous_decision = context.jump_assessment.decision if context.jump_assessment else None
+    previous_checked_on = context.assessment_checked_on
+    previous_confirmation = context.confirmed_tandem_date
     # A failed new request must not leave an earlier day eligible for booking.
+    # Created appointments are facts of the session and are not erased here.
     context.requested_date = None
     context.jump_assessment = None
     context.assessment_checked_on = None
     context.availability_approved_date = None
-    context.appointment_data = None
-    context.appointment_record = None
-    context.appointment_confirmation = None
     context.confirmed_tandem_date = None
     trace_args = {
         "date_str": date_str if isinstance(date_str, str) and re.fullmatch(r"\d{4}-\d{2}-\d{2}", date_str) else None
@@ -73,6 +75,13 @@ def evaluate_jump_day(context: ParachuteContext, date_str: str) -> str:
     context.requested_date = parsed_date
     context.jump_assessment = assessment
     context.assessment_checked_on = checked_on
+    # A same-day recheck that is still MARGINAL keeps the user's explicit tandem acceptance.
+    if (
+        previous_confirmation == parsed_date and previous_date == parsed_date
+        and previous_checked_on == checked_on
+        and previous_decision == Decision.MARGINAL and assessment.decision == Decision.MARGINAL
+    ):
+        context.confirmed_tandem_date = parsed_date
     log_event(
         architecture=context.architecture,
         tool="check_jump_day",

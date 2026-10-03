@@ -9,7 +9,7 @@ from agents import Runner
 from openai import AsyncOpenAI
 
 from src.agents.centralized.main import build_supervisor
-from src.agents.common.booking_completion import final_answer
+from src.agents.common.booking_completion import finish_turn
 
 
 @dataclass(frozen=True)
@@ -51,7 +51,7 @@ async def run_centralized_session_async(
             context.observe_user_message(turn)
             history.append({"role": "user", "content": turn})
             result = await run(current_agent, history, context=context)
-            answer = final_answer(context, result.final_output)
+            answer = finish_turn(context, result.final_output)
             if not isinstance(answer, str) or not answer.strip():
                 raise RuntimeError("El modelo devolvio una respuesta vacia.")
             history = result.to_input_list()

@@ -12,7 +12,7 @@ import re
 from agents import RunContextWrapper, function_tool
 
 from src.agents.common.context import ParachuteContext
-from src.domain.appointment_models import AppointmentData
+from src.domain.appointment_models import AppointmentData, AppointmentRecord
 from src.domain.weather_models import Decision
 from src.observability import log_event
 from src.services.calendar_service import CalendarServiceError
@@ -55,14 +55,32 @@ def evaluate_availability(context: ParachuteContext, date_str: str) -> str:
     return "Hay cupo disponible." if available else f"No hay cupo disponible para {date_str}."
 
 
+def format_confirmation(record: AppointmentRecord) -> str:
+    """User-facing confirmation derived only from the stored record."""
+    modality = "tandem con instructor experimentado" if record.data.is_experienced_tandem else "estandar"
+    return (
+        f"Cita confirmada (id={record.id}) para {record.data.jump_date.isoformat()}; "
+        f"participantes: {record.data.party_size}; modalidad: {modality}."
+    )
+
+
 def book_appointment(
     context: ParachuteContext,
     date_str: str,
-    customer_name: str,
-    contact: str,
+    customer_name: str = "",
+    contact: str = "",
     is_experienced_tandem: bool = False,
-    party_size: int = 1,
+    party_size: int | None = None,
 ) -> str:
+    # Specialists reached through as_tool() may not receive the user's data; use what the
+    # user already provided in this session instead of asking again.
+    stored = context.booking_request
+    if not (isinstance(customer_name, str) and customer_name.strip()) and stored.customer_name:
+        customer_name = stored.customer_name
+    if not (isinstance(contact, str) and contact.strip()) and stored.contact:
+        contact = stored.contact
+    if party_size is None:
+        party_size = stored.party_size if stored.party_size is not None else 1
     log_event(architecture=context.architecture, tool="create_appointment", calendar_write_attempt=1)
     trace_args = {
         "date_str": _safe_date_argument(date_str),
@@ -140,10 +158,12 @@ def book_appointment(
 
     context.appointment_data = data
     context.appointment_record = record
-    confirmation = (
-        f"Cita confirmada (id={record.id}) para {data.jump_date.isoformat()} "
-        f"a nombre de {data.customer_name}."
+    context.appointments.append(record)
+    context.remember_booking_details(
+        jump_date=data.jump_date, customer_name=data.customer_name,
+        contact=data.contact, party_size=data.party_size,
     )
+    confirmation = format_confirmation(record)
     context.appointment_confirmation = confirmation
     log_event(architecture=context.architecture, tool="create_appointment", calendar_write_result="success")
     context.record_tool_event("create_appointment", trace_args, {"created": True, "date": requested_date.isoformat()}, "success")
@@ -164,19 +184,19 @@ def check_appointment_availability(wrapper: RunContextWrapper[ParachuteContext],
 def create_appointment(
     wrapper: RunContextWrapper[ParachuteContext],
     date_str: str,
-    customer_name: str,
-    contact: str,
+    customer_name: str = "",
+    contact: str = "",
     is_experienced_tandem: bool = False,
-    party_size: int = 1,
+    party_size: int | None = None,
 ) -> str:
     """Crea la cita de salto para la fecha previamente verificada con check_jump_day.
 
     Args:
         date_str: fecha solicitada en formato YYYY-MM-DD; debe coincidir con la evaluacion vigente.
-        customer_name: nombre completo del cliente.
-        contact: telefono o correo del cliente.
+        customer_name: nombre completo del cliente; si se omite se usa el ya proporcionado por el usuario.
+        contact: telefono o correo del cliente; si se omite se usa el ya proporcionado por el usuario.
         is_experienced_tandem: True si el cliente confirma que acepta un tandem experimentado
             (obligatorio para fechas con evaluacion MARGINAL).
-        party_size: numero de personas que saltan juntas.
+        party_size: numero de personas que saltan juntas; si se omite se usa el indicado por el usuario.
     """
     return book_appointment(wrapper.context, date_str, customer_name, contact, is_experienced_tandem, party_size)

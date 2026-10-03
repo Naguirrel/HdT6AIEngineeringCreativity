@@ -5,7 +5,7 @@ import asyncio
 from agents import Agent, Runner
 
 from src.agents.common.context import ParachuteContext
-from src.agents.common.booking_completion import final_answer
+from src.agents.common.booking_completion import finish_turn
 from src.observability import log_event
 
 
@@ -45,7 +45,7 @@ async def run_chat_async(starting_agent: Agent, context: ParachuteContext, archi
                 handoff=f"{current_agent.name}->{result.last_agent.name}",
             )
 
-        print(f"[{result.last_agent.name}]: {final_answer(context, result.final_output)}\n")
+        print(f"[{result.last_agent.name}]: {finish_turn(context, result.final_output)}\n")
         history = result.to_input_list()
         current_agent = result.last_agent
 

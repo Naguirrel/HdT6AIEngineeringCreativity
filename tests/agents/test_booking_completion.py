@@ -10,7 +10,7 @@ from agents.tool_context import ToolContext
 
 from src.agents.centralized.evaluation import run_centralized_session_async
 from src.agents.centralized.main import build_supervisor
-from src.agents.common.booking_completion import booking_result_or_continue, final_answer
+from src.agents.common.booking_completion import booking_result_or_continue, finish_turn
 from src.tools.calendar_tools import book_appointment, check_appointment_availability, create_appointment, evaluate_availability
 from src.tools.weather_tools import check_jump_day, evaluate_jump_day
 from tests.agents.conftest import FIXED_TODAY, make_snapshot
@@ -36,11 +36,11 @@ def test_sdk_completion_uses_successful_tool_state_not_specialist_text(build_con
     assert result.is_final_output
     assert result.final_output == confirmation
     assert DAY.isoformat() in result.final_output
-    assert final_answer(context, "No.") == confirmation
+    assert finish_turn(context, "No.") == confirmation
 
     context.observe_user_message("Otra pregunta")
     assert not booking_result_or_continue(wrapper, [nested]).is_final_output
-    assert final_answer(context, "Otra respuesta") == "Otra respuesta"
+    assert finish_turn(context, "Otra respuesta") == "Otra respuesta"
 
 
 @pytest.mark.asyncio
