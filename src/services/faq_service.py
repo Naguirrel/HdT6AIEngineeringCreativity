@@ -17,6 +17,7 @@ _STOP_WORDS = {
     "pregunta", "saber", "dime", "decir", "debo", "debe", "deberia", "tengo", "tiene", "necesito",
     "hacer", "hice", "incluye", "existe", "favor", "gracias", "hola", "sobre", "otra", "otro",
     "tus", "tu", "usted", "ustedes", "seria", "hay", "algun", "alguna", "mucho", "muy",
+    "paracaidismo", "paracaida", "paracaidas",
 }
 # Controlled query-side synonyms (keys are stemmed). Values are words used by the corpus.
 _QUERY_ALIASES = {
@@ -39,6 +40,7 @@ _CONTACT_TERMS = {"telefono", "correo", "contacto", "instagram", "facebook", "re
 _SHORT_TERMS = {"kg", "lb"}
 # Applied before plural folding: "hora" asks when it starts, "horas" asks how long it lasts.
 _RAW_ALIASES = {"hora": "cuando", "horario": "cuando", "anos": "edad", "ano": "edad", "duracion": "dura"}
+_ALIAS_TARGETS = set(_QUERY_ALIASES.values()) | set(_RAW_ALIASES.values())
 CONTACT_QUESTION = "Telefono, correo, redes sociales y sitio web de contacto"
 
 
@@ -152,7 +154,8 @@ class FaqService:
                 (term,) = matches
                 if document_frequency[term] != 1:
                     continue
-                if term not in in_question and len(query_tokens) > 2:
+                # Curated alias concepts (e.g. "embarazo") identify the topic by themselves.
+                if term not in in_question and term not in _ALIAS_TARGETS and len(query_tokens) > 2:
                     continue
             is_contact = entry.question == CONTACT_QUESTION
             scored.append((int(wants_contact and is_contact), len(matches), -index, entry))

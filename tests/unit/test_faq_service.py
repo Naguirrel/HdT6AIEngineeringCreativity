@@ -182,3 +182,15 @@ def test_irrelevant_or_generic_queries_abstain(query):
 def test_contact_section_has_priority_for_contact_questions():
     results = FaqService.from_path(FAQ_PATH).search_faq("¿Cómo puedo reservar por WhatsApp o teléfono?")
     assert results[0].question == CONTACT
+
+
+@pytest.mark.parametrize("query", [
+    "¿Puede una persona embarazada participar en el salto en paracaídas?",
+    "¿Pueden saltar mujeres embarazadas?",
+    "restricciones de salto para embarazadas",
+    "embarazo paracaidismo",
+])
+def test_reformulated_pregnancy_queries_retrieve_health_restrictions(query):
+    # Regression from eval-VC1: the FAQ specialist rephrased the question and got 0 results.
+    results = FaqService.from_path(FAQ_PATH).search_faq(query)
+    assert results and results[0].question == HEALTH
