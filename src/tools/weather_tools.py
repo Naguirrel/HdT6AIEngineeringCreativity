@@ -45,9 +45,11 @@ def evaluate_jump_day(context: ParachuteContext, date_str: str) -> str:
     # A failed new request must not leave an earlier day eligible for booking.
     context.requested_date = None
     context.jump_assessment = None
+    context.assessment_checked_on = None
     context.availability_approved_date = None
     context.appointment_data = None
     context.appointment_record = None
+    context.appointment_confirmation = None
     context.confirmed_tandem_date = None
     trace_args = {
         "date_str": date_str if isinstance(date_str, str) and re.fullmatch(r"\d{4}-\d{2}-\d{2}", date_str) else None
@@ -61,7 +63,8 @@ def evaluate_jump_day(context: ParachuteContext, date_str: str) -> str:
         return f"Formato de fecha invalido: '{date_str}'. Usa YYYY-MM-DD."
 
     try:
-        assessment = context.services.weather_service.check_jump_day(parsed_date, context.today())
+        checked_on = context.today()
+        assessment = context.services.weather_service.check_jump_day(parsed_date, checked_on)
     except WeatherServiceError as error:
         log_event(architecture=context.architecture, tool="check_jump_day", weather_check_result="error")
         context.record_tool_event("check_jump_day", trace_args, {"error": "weather_check_failed"}, "error")
@@ -69,6 +72,7 @@ def evaluate_jump_day(context: ParachuteContext, date_str: str) -> str:
 
     context.requested_date = parsed_date
     context.jump_assessment = assessment
+    context.assessment_checked_on = checked_on
     log_event(
         architecture=context.architecture,
         tool="check_jump_day",

@@ -15,6 +15,7 @@ from agents import Agent, RunContextWrapper, handoff
 from pydantic import BaseModel
 
 from src.agents.common.bootstrap import build_context
+from src.agents.common.booking_completion import booking_result_or_continue
 from src.agents.common.cli import run_chat
 from src.agents.common.context import ParachuteContext
 from src.agents.common.model_client import build_model
@@ -79,6 +80,7 @@ def build_decentralized_agents(model) -> tuple[Agent, Agent, Agent]:
         handoff_description="Verifica disponibilidad y crea la cita de salto.",
         instructions=SCHEDULING_DECENTRALIZED_INSTRUCTIONS,
         tools=[check_appointment_availability, create_appointment],
+        tool_use_behavior=booking_result_or_continue,
         model=model,
     )
 

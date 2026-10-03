@@ -31,6 +31,19 @@ def evaluate_availability(context: ParachuteContext, date_str: str) -> str:
         context.record_tool_event("check_appointment_availability", trace_args, {"error": "invalid_date_format"}, "error")
         return f"Formato de fecha invalido: '{date_str}'. Usa YYYY-MM-DD."
 
+    assessment = context.jump_assessment
+    if (
+        assessment is None or context.requested_date != parsed_date
+        or context.assessment_checked_on != context.today()
+        or assessment.weather is None or assessment.weather.date != parsed_date
+        or not assessment.allows_appointment
+        or (assessment.requires_experienced_tandem and context.confirmed_tandem_date != parsed_date)
+    ):
+        context.record_tool_event(
+            "check_appointment_availability", trace_args, {"error": "assessment_not_approved"}, "error"
+        )
+        return "No se puede aprobar disponibilidad: primero valida el clima y los requisitos para esta fecha."
+
     try:
         available = context.services.calendar_service.check_availability(parsed_date)
     except CalendarServiceError as error:
@@ -112,7 +125,7 @@ def book_appointment(
         context.record_tool_event("create_appointment", trace_args, {"created": False, "error": "invalid_input"}, "error")
         return f"No se pudo crear la cita: {error}"
 
-    if context.availability_approved_date != requested_date:
+    if not context.has_current_booking_approvals(requested_date):
         context.record_tool_event("create_appointment", trace_args, {"created": False, "error": "availability_not_approved"}, "error")
         return "No se puede crear la cita: primero debes ejecutar check_appointment_availability para esta fecha y confirmar que hay cupo."
 
@@ -127,9 +140,14 @@ def book_appointment(
 
     context.appointment_data = data
     context.appointment_record = record
+    confirmation = (
+        f"Cita confirmada (id={record.id}) para {data.jump_date.isoformat()} "
+        f"a nombre de {data.customer_name}."
+    )
+    context.appointment_confirmation = confirmation
     log_event(architecture=context.architecture, tool="create_appointment", calendar_write_result="success")
     context.record_tool_event("create_appointment", trace_args, {"created": True, "date": requested_date.isoformat()}, "success")
-    return f"Cita confirmada (id={record.id}) para {data.jump_date.isoformat()} a nombre de {data.customer_name}."
+    return confirmation
 
 
 @function_tool

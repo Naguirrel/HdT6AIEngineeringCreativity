@@ -6,6 +6,7 @@ clima, seguridad, anti-bypass) viven en src/domain y src/services, no aqui.
 
 from agents import Agent, Handoff, Model
 
+from src.agents.common.booking_completion import booking_result_or_continue
 from src.tools.calendar_tools import check_appointment_availability, create_appointment
 from src.tools.faq_tools import search_faq
 from src.tools.weather_tools import check_jump_day
@@ -76,6 +77,7 @@ def build_scheduling_agent(model: Model, handoffs: list[Handoff | Agent] | None 
         handoff_description="Verifica disponibilidad y crea la cita de salto.",
         instructions=SCHEDULING_INSTRUCTIONS,
         tools=[check_appointment_availability, create_appointment],
+        tool_use_behavior=booking_result_or_continue,
         handoffs=handoffs or [],
         model=model,
     )

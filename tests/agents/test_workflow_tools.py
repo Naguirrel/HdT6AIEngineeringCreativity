@@ -142,6 +142,86 @@ def test_create_appointment_requires_approved_availability(build_context):
     assert context.appointment_record is None
 
 
+def test_booking_rejects_untraced_or_wrong_date_availability(build_context):
+    other_day = TOMORROW + timedelta(days=1)
+    context = build_context({TOMORROW: make_snapshot(TOMORROW), other_day: make_snapshot(other_day)})
+    evaluate_jump_day(context, TOMORROW.isoformat())
+    context.availability_approved_date = TOMORROW  # A date field alone is not authorization.
+    refused = book_appointment(context, TOMORROW.isoformat(), "Juan Perez", "juan@example.com")
+    assert "check_appointment_availability" in refused
+    assert context.appointment_record is None
+
+    assert "No se puede aprobar disponibilidad" in evaluate_availability(context, other_day.isoformat())
+    refused = book_appointment(context, TOMORROW.isoformat(), "Juan Perez", "juan@example.com")
+    assert "check_appointment_availability" in refused
+    assert context.appointment_record is None
+
+    evaluate_jump_day(context, other_day.isoformat())
+    assert "Hay cupo" in evaluate_availability(context, other_day.isoformat())
+    assert "no coincide" in book_appointment(
+        context, TOMORROW.isoformat(), "Juan Perez", "juan@example.com"
+    )
+    assert context.appointment_record is None
+
+
+def test_new_weather_check_or_date_change_invalidates_booking_approvals(build_context):
+    other_day = TOMORROW + timedelta(days=1)
+    context = build_context({TOMORROW: make_snapshot(TOMORROW), other_day: make_snapshot(other_day)})
+    evaluate_jump_day(context, TOMORROW.isoformat())
+    evaluate_availability(context, TOMORROW.isoformat())
+    assert context.has_current_booking_approvals(TOMORROW)
+
+    evaluate_jump_day(context, other_day.isoformat())
+    assert not context.has_current_booking_approvals(TOMORROW)
+    assert not context.has_current_booking_approvals(other_day)
+    assert "No se puede aprobar disponibilidad" in evaluate_availability(context, TOMORROW.isoformat())
+    assert "no coincide" in book_appointment(
+        context, TOMORROW.isoformat(), "Juan Perez", "juan@example.com"
+    )
+    assert "check_appointment_availability" in book_appointment(
+        context, other_day.isoformat(), "Juan Perez", "juan@example.com"
+    )
+
+
+def test_user_date_change_and_clock_rollover_revoke_approvals(build_context):
+    other_day = TOMORROW + timedelta(days=1)
+    context = build_context({TOMORROW: make_snapshot(TOMORROW), other_day: make_snapshot(other_day)})
+    evaluate_jump_day(context, TOMORROW.isoformat())
+    evaluate_availability(context, TOMORROW.isoformat())
+    context.today = lambda: TOMORROW
+    assert not context.has_current_booking_approvals(TOMORROW)
+    assert "No se puede aprobar disponibilidad" in evaluate_availability(context, TOMORROW.isoformat())
+
+    context.today = lambda: FIXED_TODAY
+    evaluate_jump_day(context, TOMORROW.isoformat())
+    evaluate_availability(context, TOMORROW.isoformat())
+    context.observe_user_message(f"Cambia la fecha a {other_day.isoformat().replace('-', '‑')}")
+    assert context.jump_assessment is None
+    assert context.availability_approved_date is None
+    assert "primero debes ejecutar check_jump_day" in book_appointment(
+        context, TOMORROW.isoformat(), "Juan Perez", "juan@example.com"
+    )
+
+
+def test_marginal_without_confirmation_cannot_approve_availability(build_context):
+    context = build_context({TOMORROW: make_snapshot(TOMORROW, wind_speed_10m_kmh=25.0)})
+    evaluate_jump_day(context, TOMORROW.isoformat())
+    assert "No se puede aprobar disponibilidad" in evaluate_availability(context, TOMORROW.isoformat())
+    assert context.availability_approved_date is None
+    assert context.get_tool_trace()[-1]["status"] == "error"
+    context.observe_user_message(f"Acepto tándem experimentado para {TOMORROW.isoformat()}")
+    assert "Hay cupo" in evaluate_availability(context, TOMORROW.isoformat())
+    assert context.has_current_booking_approvals(TOMORROW)
+
+
+def test_prohibited_weather_cannot_approve_availability(build_context):
+    context = build_context({TOMORROW: make_snapshot(TOMORROW, precipitation_mm=1.0)})
+    evaluate_jump_day(context, TOMORROW.isoformat())
+    assert "No se puede aprobar disponibilidad" in evaluate_availability(context, TOMORROW.isoformat())
+    assert context.availability_approved_date is None
+    assert context.get_tool_trace()[-1]["result"]["error"] == "assessment_not_approved"
+
+
 def test_weather_recheck_revokes_previous_availability_approval(build_context):
     context = build_context({TOMORROW: make_snapshot(TOMORROW)})
     evaluate_jump_day(context, TOMORROW.isoformat())
@@ -178,6 +258,8 @@ def test_create_appointment_requires_experienced_tandem_for_marginal(build_conte
 
     context.observe_user_message("Sí, acepto tándem experimentado para 2026-01-01")
     assert context.confirmed_tandem_date is None
+    assert context.jump_assessment is None
+    evaluate_jump_day(context, TOMORROW.isoformat())
     context.observe_user_message(f"Sí, acepto tándem experimentado para {TOMORROW.isoformat()}")
     evaluate_availability(context, TOMORROW.isoformat())
     confirmed = book_appointment(context, TOMORROW.isoformat(), "Juan Perez", "juan@example.com", is_experienced_tandem=True)

@@ -7,6 +7,7 @@ import pytest
 from agents import Agent
 
 from src.agents.centralized.main import build_supervisor
+from src.agents.common.booking_completion import booking_result_or_continue
 from src.agents.common.model_client import build_model
 from src.agents.common.specialist_agents import build_faq_agent, build_scheduling_agent
 from src.agents.decentralized.main import build_decentralized_agents
@@ -26,6 +27,7 @@ def test_centralized_supervisor_exposes_three_specialists_as_tools():
     tool_names = {tool.name for tool in supervisor.tools}
     assert tool_names == {"faq_specialist", "weather_specialist", "scheduling_specialist"}
     assert context.services.faq_service.entries
+    assert supervisor.tool_use_behavior is booking_result_or_continue
 
 
 def test_centralized_supervisor_instructions_enforce_domain_boundary():
@@ -71,6 +73,7 @@ def test_scheduling_specialist_requires_complete_workflow():
     assert "check_jump_day, despues check_appointment_availability y finalmente create_appointment" in instructions
     assert "no llames create_appointment si la disponibilidad no fue comprobada y aprobada" in instructions
     assert "si la herramienta confirma la cita, informa el exito y la fecha" in instructions
+    assert agent.tool_use_behavior is booking_result_or_continue
 
 
 def test_hierarchical_root_manager_has_two_levels():
@@ -78,6 +81,7 @@ def test_hierarchical_root_manager_has_two_levels():
     root_tool_names = {tool.name for tool in root_manager.tools}
     assert root_tool_names == {"knowledge_manager", "booking_manager"}
     assert "faq_specialist" not in root_tool_names
+    assert root_manager.tool_use_behavior is booking_result_or_continue
     assert "weather_specialist" not in root_tool_names
 
 
@@ -95,6 +99,7 @@ def test_decentralized_agents_are_wired_with_handoffs():
     assert faq_handoff_targets == {"Weather Agent"}
     assert weather_handoff_targets == {"FAQ Agent", "Scheduling Agent"}
     assert scheduling_handoff_targets == {"FAQ Agent"}
+    assert scheduling_agent.tool_use_behavior is booking_result_or_continue
 
 
 def test_decentralized_has_no_permanent_global_supervisor():

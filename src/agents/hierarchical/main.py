@@ -9,6 +9,7 @@ import sys
 from agents import Agent
 
 from src.agents.common.bootstrap import build_context
+from src.agents.common.booking_completion import booking_result_or_continue
 from src.agents.common.cli import run_chat
 from src.agents.common.context import ParachuteContext
 from src.agents.common.model_client import build_model
@@ -59,6 +60,7 @@ def build_root_manager() -> tuple[Agent, ParachuteContext]:
         name="Booking Manager",
         instructions=BOOKING_MANAGER_INSTRUCTIONS,
         model=model,
+        tool_use_behavior=booking_result_or_continue,
         tools=[
             weather_agent.as_tool(
                 tool_name="weather_specialist",
@@ -75,6 +77,7 @@ def build_root_manager() -> tuple[Agent, ParachuteContext]:
         name="Root Manager",
         instructions=ROOT_INSTRUCTIONS,
         model=model,
+        tool_use_behavior=booking_result_or_continue,
         tools=[
             knowledge_manager.as_tool(
                 tool_name="knowledge_manager",
