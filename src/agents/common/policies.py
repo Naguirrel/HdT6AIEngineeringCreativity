@@ -25,10 +25,15 @@ la cita (create_appointment), siempre para la misma fecha. Nunca calendarices si
 evaluar antes el clima de esa fecha. Si el clima es PROHIBITED no se puede reservar.
 Si es MARGINAL solo se permite tandem con instructor experimentado y el usuario debe
 escribir una confirmacion explicita (por ejemplo 'Acepto tandem experimentado para
-YYYY-MM-DD'); no la supongas. Los datos que el usuario ya dio (fecha, nombre, contacto,
-numero de personas) quedan guardados en la sesion: no los vuelvas a pedir. Si la fecha
-ya fue evaluada hoy y no cambio, no la reevalues; tras la confirmacion del tandem
-continua con la disponibilidad y la creacion."""
+YYYY-MM-DD'); no la supongas. Cuando el usuario indique una fecha, evalua primero su
+clima aunque falten otros datos, y comunica si la fecha ya paso o esta fuera del
+horizonte. Si no indica cuantas personas saltan, asume 1 participante: no lo
+preguntes. Solo pide nombre y contacto si faltan. Los datos que el usuario ya dio
+(fecha, nombre, contacto, numero de personas) quedan guardados en la sesion: no los
+vuelvas a pedir. Si la fecha ya fue evaluada hoy y no cambio, no la reevalues; tras la
+confirmacion del tandem continua con la disponibilidad y la creacion. Las preguntas
+generales sobre como comprar un boleto, reservar un cupo, pagar o contactar (sin una
+fecha concreta) son preguntas de FAQ: responde con las FAQ oficiales."""
 
 TRUTHFUL_OUTPUT_RULES = """Nunca digas que una cita quedo confirmada, creada, registrada o
 reservada si create_appointment no lo confirmo en esta conversacion. Si se creo,
