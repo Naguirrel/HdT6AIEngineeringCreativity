@@ -254,7 +254,7 @@ en lugar de repetir una llamada bloqueada. El provider Python tiene
 `config.timeout: 180000` (tres minutos) y ese valor prevalece sobre el límite
 global para su worker. Sin ese override, la ejecución
 `eval-ak7-2026-09-30T20:19:50` produjo `Python worker timed out after 45000ms`.
-Las assertions de `factuality` siguen activas.
+La assertion de `factuality` sigue activa en `faq_place_date`.
 
 ### Validación, ejecución y reportes
 
@@ -302,24 +302,22 @@ consulta Open-Meteo real. El calendario tambien es simulado en memoria.
   herramientas presentes o ausentes, recuento, orden exacto, fecha,
   `party_size`, estado y resultado. Compara SHA-256 de nombre y contacto
   ficticios para confirmar los argumentos sin exponerlos en la traza.
-- `factuality` compara la respuesta con referencias del corpus FAQ o con
-  los resultados deterministas de la politica meteorologica. Es una
-  calificacion de modelo y puede variar; no sustituye las verificaciones
-  deterministas ni garantiza que se haya llamado una herramienta.
-  Se aplica solo a tres casos de los 32, frente a 11 antes de reducir
-  llamadas al grader:
-  - `faq_place_date`: coherencia semantica de lugar, fecha y hora del evento.
-  - `appointment_marginal_unconfirmed`: condicion de tandem experimentado
-    sin confirmacion del usuario.
-  - `appointment_prohibited_wind`: prohibicion de reservar por viento inseguro.
+- `factuality` compara la respuesta con la referencia del corpus FAQ en
+  `faq_place_date`, el unico caso de los 32 que conserva esa assertion.
+  Es una calificacion de modelo y puede variar; no sustituye las
+  verificaciones deterministas ni garantiza que se haya llamado una herramienta.
+  Las citas usan `regex` para hechos concretos y `python` para reglas y trazas
+  estructuradas. En `eval-Lpp-2026-10-03T05:14:42`, el grader marco como fallo
+  una respuesta marginal correcta y dio `RateLimitExhaustedError` al evaluar
+  el viento prohibido. Por eso no se usa `factuality` para esas citas.
   En `faq_minor` se retiro `factuality` tras falsos negativos repetidos cuando
   el corpus incluye una regla general de 18 anos con una excepcion explicita
   para 16 y 17 anos. Sus assertions deterministas comprueban los 17 anos,
   acompanamiento por padres o tutores, carta de responsabilidad y traza FAQ.
   En los otros casos, hechos exactos como peso, telefono, ropa y fecha se
   comprueban con `contains` o `regex`, junto con la traza de herramientas.
-  El grader requiere cuota del proveedor aun con concurrencia uno; menos
-  llamadas reducen ese riesgo, pero no garantizan una evaluacion sin errores.
+  El grader requiere cuota del proveedor aun con concurrencia uno; conservarlo
+  en una FAQ permite demostrarlo sin depender de el para reglas de citas.
 - `latency` usa 60 000 ms para FAQ y 180 000 ms para citas. El provider mide
   desde la construccion del supervisor hasta la ultima respuesta, incluidos
   todos los turnos y herramientas; el evaluador de factualidad se ejecuta

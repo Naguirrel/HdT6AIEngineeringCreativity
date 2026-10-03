@@ -78,9 +78,12 @@
     expect_tool_events:
       - {tool: check_jump_day, result: {decision: MARGINAL}, status: success}
   assert:
-    - {type: regex, value: '([Tt][aá]ndem|[Ii]nstructor experimentado)'}
+    - {type: regex, value: '\b[Mm][Aa][Rr][Gg][Ii][Nn][Aa][Ll]\b'}
+    - {type: regex, value: '(?<!\d)20\s*km\s*/\s*h\b'}
+    - {type: regex, value: '\b[Tt][aá]ndem\b'}
+    - {type: regex, value: '\b[Ii]nstructor(?:a)?\s+[Ee]xperimentad[oa]\b'}
+    - {type: regex, value: '(?:\b[Cc]onfirm(?:a|e|as|es)\b.{0,120}\b[Tt][aá]ndem\b|\b[Aa]cept(?:a|as|es|ar)\b.{0,120}\b[Tt][aá]ndem\b|¿[^?]{0,180}\b(?:[Dd]eseas|[Qq]uieres)\s+reservar\b[^?]{0,180}\b[Tt][aá]ndem\b[^?]{0,180}\?)'}
     - {type: python, value: 'file://assertions/tool_trace.py'}
-    - {type: factuality, value: 'Con viento de 20 km/h, el salto es marginal y solo se permite en tándem con instructor experimentado.'}
 - description: Confirmación marginal explícita en turno posterior
   vars:
     scenario: appointment_marginal_confirmed
@@ -120,9 +123,10 @@
     expect_tool_events:
       - {tool: check_jump_day, result: {decision: PROHIBITED}, status: success}
   assert:
-    - {type: regex, value: '(28[.,]1|[Vv]iento|[Nn]o.{0,50}cita)'}
+    - {type: regex, value: '(?:\b[Pp][Rr][Oo][Hh][Ii][Bb][Ii][Tt][Ee][Dd]\b|\b[Pp]rohibid[oa]\b|\b[Nn]o\s+(?:se\s+)?puede\s+(?:crear|reservar)\b)'}
+    - {type: regex, value: '(?:(?<!\d)28[.,]1\s*km\s*/\s*h\b|\b(?:[Ll][ií]mite|[Uu]mbral|[Ss]upera|[Ee]xcede|[Ss]uperior\s+a)\b.{0,30}(?<!\d)28\s*km\s*/\s*h\b)'}
+    - {type: regex, value: '\b[Nn]o\s+(?:se\s+)?(?:puede|es\s+posible)\s+(?:crear|reservar|calendarizar)(?:\s+una)?\s+cita\b'}
     - {type: python, value: 'file://assertions/tool_trace.py'}
-    - {type: factuality, value: 'Con viento de 28.1 km/h, las condiciones prohíben el salto y no se puede crear una cita.'}
 - description: Ráfagas mayores a 35 km por hora
   vars:
     scenario: appointment_prohibited_gusts
