@@ -261,16 +261,21 @@ La assertion de `factuality` sigue activa en `faq_place_date`.
 ```powershell
 python -m pytest -q -p no:cacheprovider
 npm run eval:validate
-npm run eval -- --filter-first-n 3 --max-concurrency 1 --env-file .env
-npm run eval -- --filter-first-n 12 --max-concurrency 1 --env-file .env
-npm run eval -- --max-concurrency 1 --env-file .env
-npm run eval:report -- --max-concurrency 1 --env-file .env
+npm run test:assertions
+npm run eval:faq -- --env-file .env
+npm run eval:booking -- --env-file .env
+npm run eval:marginal -- --env-file .env
+npm run eval:prohibited -- --env-file .env
+npm run eval -- --env-file .env
+npm run eval:report -- --env-file .env
 npm run eval:view
 ```
 
-Los filtros `--filter-first-n 3` y `12` recorren, respectivamente, los tres
-primeros FAQ y los doce FAQ completos, porque ese archivo aparece primero en
-`evals/promptfooconfig.yaml`. `eval:report` lanza una **nueva** evaluación
+Las fases se seleccionan por `metadata.phase` (`faq`, `booking`, `marginal`,
+`prohibited`) con `--filter-metadata`, no por posición. Para casos sueltos usa
+`npm run eval -- --filter-pattern "<descripción>" --env-file .env`. La
+concurrencia está fijada en 1 en la configuración y en los scripts.
+`eval:report` lanza una **nueva** evaluación
 completa y exporta sus resultados; no reutiliza una corrida previa porque el
 script tiene `--no-cache`. Inspecciona los fallos antes de versionar el reporte.
 
@@ -283,10 +288,13 @@ las evaluaciones locales de Promptfoo. Sin credenciales, `pytest` y
 
 ### Casos, datos y metricas
 
-Hay **32 casos**: 12 FAQ (hechos del evento, restricciones, contacto,
-informacion ausente, saludo y despedida) y 20 citas (datos incompletos,
-fronteras de fecha y clima, confirmacion marginal, errores, cambio de fecha,
-intento de omitir clima y orden de herramientas). El reloj se fija por defecto
+Hay **43 casos**: 14 FAQ (hechos del evento, lugar reformulado, embarazo,
+restricciones, contacto, informacion ausente, saludo y despedida) y 29 citas
+(datos incompletos o invalidos, hoy, fronteras de fecha y clima, confirmacion
+marginal por viento y nubes, fechas textuales, cupo agotado con
+`calendar_fixture`, grupo mayor a la capacidad, reserva repetida, prompt
+injection, solicitud combinada con FAQ, errores, cambio de fecha y orden de
+herramientas). El reloj se fija por defecto
 en `2026-09-17`; la fecha valida de referencia es `2026-09-20`, la ultima
 `2026-10-02` y la primera fuera de horizonte `2026-10-03`.
 

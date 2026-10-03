@@ -1,4 +1,5 @@
 - description: FAQ lugar y fecha del evento
+  metadata: {phase: faq}
   vars:
     scenario: faq_place_date
     turns: ["¿Cuándo y dónde se realizará el evento de paracaidismo?"]
@@ -19,6 +20,7 @@
       value: 'El evento será el 29 de septiembre de 2026 en la Pista de Aterrizaje de Puerto San José, Escuintla, Guatemala, a partir de las 07:00 AM.'
     - {type: latency, threshold: 60000}
 - description: FAQ peso máximo
+  metadata: {phase: faq}
   vars:
     scenario: faq_weight
     turns: ["¿Cuál es el límite de peso para saltar?"]
@@ -35,6 +37,7 @@
       value: file://assertions/tool_trace.py
     - {type: latency, threshold: 60000}
 - description: FAQ cámaras personales GoPro
+  metadata: {phase: faq}
   vars:
     scenario: faq_camera
     turns: ["¿Puedo llevar mi GoPro durante el salto?"]
@@ -51,6 +54,7 @@
       value: file://assertions/tool_trace.py
     - {type: latency, threshold: 60000}
 - description: FAQ requisito para participante de 17 años
+  metadata: {phase: faq}
   vars:
     scenario: faq_minor
     turns: ["Tengo 17 años, ¿qué necesito para participar?"]
@@ -69,6 +73,7 @@
       value: file://assertions/tool_trace.py
     - {type: latency, threshold: 60000}
 - description: FAQ ropa recomendada
+  metadata: {phase: faq}
   vars:
     scenario: faq_clothes
     turns: ["¿Qué ropa debo usar para el salto?"]
@@ -85,6 +90,7 @@
       value: file://assertions/tool_trace.py
     - {type: latency, threshold: 60000}
 - description: FAQ contacto oficial
+  metadata: {phase: faq}
   vars:
     scenario: faq_contact
     turns: ["¿Cuál es el teléfono de contacto de Parachute S.A.?"]
@@ -101,6 +107,7 @@
       value: file://assertions/tool_trace.py
     - {type: latency, threshold: 60000}
 - description: FAQ precio ausente del corpus
+  metadata: {phase: faq}
   vars:
     scenario: faq_missing_price
     turns: ["¿Cuál es el precio exacto en quetzales de un salto tándem básico?"]
@@ -116,6 +123,7 @@
       value: file://assertions/tool_trace.py
     - {type: latency, threshold: 60000}
 - description: FAQ seguro médico ausente del corpus
+  metadata: {phase: faq}
   vars:
     scenario: faq_missing_insurance
     turns: ["¿Qué seguro médico incluye el salto y cuál es su cobertura?"]
@@ -131,6 +139,7 @@
       value: file://assertions/tool_trace.py
     - {type: latency, threshold: 60000}
 - description: Pregunta completamente fuera del dominio
+  metadata: {phase: faq}
   vars:
     scenario: faq_out_of_domain
     turns: ["¿Quién ganó el mundial de ajedrez de 1972?"]
@@ -145,6 +154,7 @@
       value: file://assertions/tool_trace.py
     - {type: latency, threshold: 60000}
 - description: Saludo sin herramientas de negocio
+  metadata: {phase: faq}
   vars:
     scenario: greeting
     turns: ["Hola, buen día"]
@@ -157,6 +167,7 @@
       value: file://assertions/tool_trace.py
     - {type: latency, threshold: 60000}
 - description: Despedida sin herramientas de negocio
+  metadata: {phase: faq}
   vars:
     scenario: farewell
     turns: ["Gracias por la ayuda, hasta luego"]
@@ -169,6 +180,7 @@
       value: file://assertions/tool_trace.py
     - {type: latency, threshold: 60000}
 - description: FAQ ropa reformulada
+  metadata: {phase: faq}
   vars:
     scenario: faq_clothes_rephrased
     turns: ["¿Cómo debería vestirme para la actividad aérea?"]
@@ -180,6 +192,40 @@
       value: '\b(?:[Rr][Oo][Pp][Aa][\s*_]+[Cc][oOóÓ][Mm][oOóÓ][Dd][Aa]|[Rr][Oo][Pp][Aa][\s*_]+[Dd][Ee][Pp][Oo][Rr][Tt][Ii][Vv][Aa])\b'
     - type: regex
       value: '\b[Tt][Ee][Nn][Ii][Ss]\b'
+    - *no_booking_claim
+    - type: python
+      value: file://assertions/tool_trace.py
+    - {type: latency, threshold: 60000}
+- description: FAQ lugar reformulado
+  metadata: {phase: faq}
+  vars:
+    scenario: faq_place_rephrased
+    turns: ["¿Dónde es el evento?"]
+    expect_tools: [search_faq]
+    forbid_tools: [check_jump_day, check_appointment_availability, create_appointment]
+    min_retrieved_context: 1
+  assert:
+    - type: regex
+      value: 'Puerto[\s  ]+San[\s  ]*Jos'
+    - *no_booking_claim
+    - type: python
+      value: file://assertions/tool_trace.py
+    - {type: latency, threshold: 60000}
+- description: FAQ restricción por embarazo
+  metadata: {phase: faq}
+  vars:
+    scenario: faq_pregnancy
+    turns: ["Estoy embarazada, ¿puedo saltar?"]
+    expect_tools: [search_faq]
+    forbid_tools: [check_jump_day, check_appointment_availability, create_appointment]
+    min_retrieved_context: 1
+  assert:
+    - type: regex
+      value: '[Ee]mbaraz'
+    - type: regex
+      value: '\b[Nn]o\s+(?:se\s+)?(?:te\s+)?(?:permit\w*|pued\w*|est[aá]\s+permitid\w*|es\s+posible|recomend\w*)|[Pp]rohib\w*|[Rr]estric\w*'
+    - type: not-regex
+      value: '\b[Ss][ií],?\s+(?:puedes|es\s+posible|est[aá]\s+permitido)'
     - *no_booking_claim
     - type: python
       value: file://assertions/tool_trace.py

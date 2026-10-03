@@ -28,6 +28,7 @@ async def run_centralized_session_async(
     build: Callable = build_supervisor,
     run: Callable = Runner.run,
     weather_service=None,
+    calendar_service=None,
     fixed_today: date | None = None,
 ) -> EvaluationResult:
     """Create fresh agent, services, context, history and calendar for each case."""
@@ -39,6 +40,8 @@ async def run_centralized_session_async(
     # Close it before returning to Promptfoo's persistent worker and event loop.
     client = getattr(getattr(supervisor, "model", None), "_client", None)
     try:
+        if calendar_service is not None:
+            context.services.calendar_service = calendar_service
         if weather_service is not None:
             context.services.weather_service = weather_service
         if fixed_today is not None:

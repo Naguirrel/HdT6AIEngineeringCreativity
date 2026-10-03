@@ -10,6 +10,7 @@ if str(ROOT) not in sys.path:
 
 from src.agents.centralized.evaluation import run_centralized_session_async
 from src.config import ConfigError
+from evals.fixtures.calendar import make_calendar_service
 from evals.fixtures.weather import FixtureError, make_weather_service
 
 
@@ -25,8 +26,11 @@ async def call_api(prompt, options, context):
         fixed_today = date.fromisoformat(variables.get("fixed_today", "2026-09-17"))
         weather_fixture = variables.get("weather_fixture", "ideal")
         weather_service = make_weather_service(weather_fixture)
+        calendar_fixture = variables.get("calendar_fixture", "empty")
+        calendar_service = make_calendar_service(calendar_fixture)
         result = await run_centralized_session_async(
-            turns, fixed_today=fixed_today, weather_service=weather_service
+            turns, fixed_today=fixed_today, weather_service=weather_service,
+            calendar_service=calendar_service,
         )
     except ConfigError as error:
         return {"error": f"Configuracion: {error}"}
@@ -43,6 +47,7 @@ async def call_api(prompt, options, context):
             "retrieved_context": result.retrieved_context,
             "latency_ms": result.latency_ms,
             "weather_fixture": weather_fixture,
+            "calendar_fixture": calendar_fixture,
             "weather_requests": result.weather_requests,
             "real_open_meteo_contacted": False,
             "confirmed_tandem_date": result.confirmed_tandem_date,

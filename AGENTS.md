@@ -84,7 +84,7 @@ Primero repetir pytest y la validación como indica el README. El **primer eval
 pendiente** es:
 
 ```powershell
-npm run eval -- --filter-first-n 12 --max-concurrency 1 --env-file .env
+npm run eval:faq -- --env-file .env
 ```
 
 Clasificar cada error y fallo sin confundir problemas del provider con fallos
