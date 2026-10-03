@@ -93,12 +93,12 @@ async def test_promptfoo_provider_handles_invalid_turns():
     assert "error" in await call_api("", {}, {"vars": {"turns": 42}})
 
 
-@pytest.mark.asyncio
-async def test_promptfoo_provider_closes_each_client_on_one_persistent_loop(monkeypatch):
+def test_promptfoo_provider_survives_repeated_asyncio_run_like_the_real_worker(monkeypatch):
+    """Promptfoo 0.123.1 persistent_wrapper calls asyncio.run(call_api(...)) for every case,
+    so each case runs on a brand-new event loop; clients must be created and closed per case."""
     from evals import provider
 
-    loop = asyncio.get_running_loop()
-    clients = []
+    clients, loops = [], []
 
     def build_with_client():
         agent, context = _build()
@@ -108,7 +108,7 @@ async def test_promptfoo_provider_closes_each_client_on_one_persistent_loop(monk
         return agent, context
 
     async def fake_run(agent, history, *, context):
-        assert asyncio.get_running_loop() is loop
+        loops.append(asyncio.get_running_loop())
         assert not clients[-1].is_closed()
         return SimpleNamespace(
             final_output="respuesta",
@@ -117,16 +117,14 @@ async def test_promptfoo_provider_closes_each_client_on_one_persistent_loop(monk
         )
 
     async def session(turns, **kwargs):
-        return await run_centralized_session_async(
-            turns, build=build_with_client, run=fake_run, **kwargs
-        )
+        return await run_centralized_session_async(turns, build=build_with_client, run=fake_run, **kwargs)
 
     monkeypatch.setattr(provider, "run_centralized_session_async", session)
     for _ in range(3):
-        response = await provider.call_api(
-            "consulta", {}, {"vars": {"scenario": "faq", "turns": ["consulta"]}}
-        )
+        response = asyncio.run(provider.call_api("consulta", {}, {"vars": {"scenario": "faq", "turns": ["consulta"]}}))
         assert response["output"] == "respuesta"
         assert response["metadata"]["tool_calls"] == []
         assert clients[-1].is_closed()
     assert len(clients) == 3
+    assert len({id(loop) for loop in loops}) == 3  # one fresh loop per case, as in the real worker
+    assert all(loop.is_closed() for loop in loops)

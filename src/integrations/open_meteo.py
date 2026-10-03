@@ -15,6 +15,14 @@ DAILY_VARIABLES = [
     "cloud_cover_mean",
     "wind_speed_10m_max",
 ]
+# Units requested below; a response in other units must not be interpreted silently.
+EXPECTED_UNITS = {
+    "wind_gusts_10m_max": {"km/h"},
+    "wind_speed_10m_max": {"km/h"},
+    "precipitation_sum": {"mm"},
+    "cloud_cover_mean": {"%"},
+    "temperature_2m_max": {"°C", "C"},
+}
 
 
 class OpenMeteoError(RuntimeError):
@@ -65,30 +73,40 @@ class OpenMeteoClient:
             raise OpenMeteoError("La respuesta de Open-Meteo no incluye la seccion 'daily'.")
 
         dates = daily.get("time")
-        if not isinstance(dates, list) or requested_date.isoformat() not in dates:
+        if not isinstance(dates, list) or not dates or requested_date.isoformat() not in dates:
             raise OpenMeteoError(
                 f"Open-Meteo no devolvio pronostico para la fecha solicitada {requested_date.isoformat()}."
             )
         index = dates.index(requested_date.isoformat())
 
-        try:
-            wind_speed = daily["wind_speed_10m_max"][index]
-            wind_gust = daily["wind_gusts_10m_max"][index]
-            precipitation = daily["precipitation_sum"][index]
-            cloud_cover = daily["cloud_cover_mean"][index]
-            temperature = daily["temperature_2m_max"][index]
-        except (KeyError, IndexError, TypeError) as error:
-            raise OpenMeteoError("La respuesta de Open-Meteo tiene una estructura incompleta.") from error
+        units = payload.get("daily_units")
+        if units is not None:
+            if not isinstance(units, dict):
+                raise OpenMeteoError("La respuesta de Open-Meteo tiene unidades invalidas.")
+            for variable, expected in EXPECTED_UNITS.items():
+                if variable in units and units[variable] not in expected:
+                    raise OpenMeteoError(f"Open-Meteo devolvio {variable} en una unidad inesperada.")
 
-        if any(value is None for value in (wind_speed, wind_gust, precipitation, cloud_cover, temperature)):
+        values = {}
+        for variable in DAILY_VARIABLES:
+            series = daily.get(variable)
+            if not isinstance(series, list) or len(series) != len(dates):
+                raise OpenMeteoError("La respuesta de Open-Meteo tiene una estructura incompleta.")
+            values[variable] = series[index]
+
+        if any(value is None for value in values.values()):
             raise OpenMeteoError(f"Open-Meteo devolvio datos incompletos para {requested_date.isoformat()}.")
 
-        return WeatherSnapshot(
-            date=requested_date,
-            wind_speed_10m_kmh=float(wind_speed),
-            wind_gust_10m_kmh=float(wind_gust),
-            precipitation_mm=float(precipitation),
-            cloud_cover_percent=float(cloud_cover),
-            temperature_2m_c=float(temperature),
-            source="open-meteo",
-        )
+        try:
+            return WeatherSnapshot(
+                date=requested_date,
+                wind_speed_10m_kmh=values["wind_speed_10m_max"],
+                wind_gust_10m_kmh=values["wind_gusts_10m_max"],
+                precipitation_mm=values["precipitation_sum"],
+                cloud_cover_percent=values["cloud_cover_mean"],
+                temperature_2m_c=values["temperature_2m_max"],
+                source="open-meteo",
+            )
+        except ValueError as error:
+            # NaN, infinity, negative or non-numeric values are rejected, never treated as IDEAL.
+            raise OpenMeteoError(f"Open-Meteo devolvio datos invalidos para {requested_date.isoformat()}.") from error
