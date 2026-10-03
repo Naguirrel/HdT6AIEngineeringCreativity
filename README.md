@@ -317,9 +317,30 @@ histórica. Commit = último commit anterior a la hora de la corrida.
 | `eval-Lpp…` | `fad7f3f` | 3 | 0 / 2 / 1 | Válida: confirmación alucinada sin `create_appointment` |
 | `eval-RGS…` | `5c2fd60` | 3 | 0 / 3 / 0 | Válida: marginal confirmado sin crear, PROHIBITED sin umbral |
 
-Las corridas posteriores sobre esta rama se documentan en la sección
-"Resultados en `fix-audit-findings`" en cuanto existan. No hay resultados
-nuevos hasta ejecutarlos.
+### Resultados en `fix-audit-findings`
+
+Corridas reales con Groq (concurrencia 1), ejecutadas por fases. Cada FAIL se
+analizó con la traza, se corrigió en un commit propio y se repitió solo el caso
+afectado. Los ERROR son de cuota o del proveedor, no fallos del agente.
+
+| ID | Commit | Casos | Pass / Fail / Error | Análisis |
+|---|---|---|---|---|
+| `eval-VC1-2026-10-03T06:39:12` | `ceb47a6` | 14 (fase `faq`) | 12 / 1 / 1 | FAIL `faq_pregnancy`: 0 entradas recuperadas (corregido en `ea5f9cf`, `0ae576c`). ERROR `faq_place_date`: `RateLimitExhaustedError` del grader |
+| `eval-Ufz-2026-10-03T06:42:30` | `ea5f9cf` | 1 | 0 / 1 / 0 | El especialista buscó con una reformulación de 9 caracteres; se añadió el respaldo con las palabras del usuario |
+| `eval-reC-2026-10-03T06:43:25` | `0ae576c` | 1 | 1 / 0 / 0 | `faq_pregnancy` aprobado |
+| `eval-WVb-2026-10-03T06:43:38` | `0ae576c` | 16 (fase `booking`) | 12 / 3 / 1 | FAIL `appointment_past`, `appointment_last_valid` (pedía el número de personas) y `appointment_info_only` (corregidos en `3144cba`). ERROR `appointment_full_order`: `RateLimitError` |
+| `eval-Txz-2026-10-03T06:52:02` | `3144cba` | 4 | 3 / 1 / 0 | FAIL `appointment_last_valid`: "No, …" con IDEAL y cupo (corregido en `df1b1c9`) |
+| `eval-JVe-2026-10-03T06:54:35` | `df1b1c9` | 1 | 1 / 0 / 0 | `appointment_last_valid` aprobado |
+| `eval-oq5-2026-10-03T06:54:49` | `df1b1c9` | 7 (fase `marginal`) | 1 / 1 / 5 | `appointment_marginal_confirmed` aprobado con `create_appointment` real. FAIL `appointment_marginal_unconfirmed`: omitía 20 km/h (corregido en `a49d40e`). ERROR: 4 `RateLimitError` y 1 `BadRequestError` |
+| `eval-7T0-2026-10-03T07:00:27` | `a49d40e` | 6 | 0 / 0 / 6 | Todos `RateLimitError` (tras 3 min de espera) |
+| `eval-Skw-2026-10-03T07:15:53` | `a49d40e` | 1 | 0 / 0 / 1 | `RateLimitError` tras 15 min de espera |
+
+**Bloqueo externo vigente:** la cuota del proveedor LLM quedó agotada. Siguen
+pendientes `faq_place_date` (grader), 6 casos marginales, la fase `prohibited`
+(6 casos) y la **corrida completa única de los 43 casos** sobre el commit final.
+Por eso todavía no existen `reports/promptfoo-report.html` ni
+`reports/promptfoo-results.json`. Los aprobados anteriores se obtuvieron en
+commits previos; solo la corrida completa final cuenta como resultado de la hoja.
 
 ## Límites conocidos
 

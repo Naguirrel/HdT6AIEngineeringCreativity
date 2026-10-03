@@ -12,9 +12,11 @@ La rama `fix-audit-findings` corrige los 27 hallazgos de la auditoría
 (AUD-001 a AUD-027). Hay **43 casos** Promptfoo (14 FAQ y 29 de citas),
 agrupados por `metadata.phase`: `faq`, `booking`, `marginal` y `prohibited`.
 La suite Python tiene **468 pruebas** y `npm run eval:validate` valida la
-configuración. Las corridas Promptfoo históricas se ejecutaron con código
-anterior: ver la tabla del README. Cualquier corrida nueva sobre esta rama se
-registra con su ID y commit exactos.
+configuración. Las corridas por fases sobre esta rama y sus correcciones están en
+el README ("Resultados en `fix-audit-findings`"). **Bloqueo vigente:** la cuota del
+proveedor LLM se agotó (`RateLimitError` persistente). Quedan pendientes 6 casos
+marginales, la fase `prohibited`, `faq_place_date` y la corrida completa final de
+43 casos con su reporte. La hoja no está terminada hasta completarlos.
 
 ## Reglas obligatorias
 
