@@ -14,7 +14,9 @@
       - {tool: check_jump_day, arguments: {date_str: '2026-09-20'}, result: {decision: IDEAL}, status: success}
       - {tool: create_appointment, arguments: {date_str: '2026-09-20', party_size: 2}, result: {created: true}, status: success}
   assert:
-    - {type: regex, value: '(?<!\d)2026[-\u2010-\u2015\u2212]09[-\u2010-\u2015\u2212]20(?!\d)'}
+    - &date_0920
+      type: regex
+      value: '(?<!\d)(?:2026[-‐-―−]09[-‐-―−]20|20(?:[\s  *_]+de)?[\s  *_]+[Ss]ept?iembre(?:[\s  *_]+(?:de[\s  *_]+)?2026)?|20/09/2026)(?!\d)'
     - {type: python, value: 'file://assertions/tool_trace.py'}
 - description: Solicitud de cita sin fecha
   vars:
@@ -24,6 +26,9 @@
     expect_weather_requests: []
   assert:
     - {type: regex, value: '([Ff]echa|[Cc]u[aá]ndo|[Dd][ií]a)'}
+    - &no_booking_claim
+      type: not-regex
+      value: '(?:[Cc]ita|[Rr]eserva(?:ci[oó]n)?|[Ss]alto)(?:(?!\b(?:[Nn]o|[Aa][uú]n|[Ss]i|[Cc]uando|[Pp]ara|[Pp]endiente|quedar[aá]|quede|ser[aá]|podr[aá])\b)[^.!?\n]){0,60}\b(?:confirmad|cread|registrad|reservad|agendad|programad)[oa]s?\b|\b[Hh]e(?:mos)?\s+(?:reservado|agendado|creado|registrado|confirmado)\b'
     - {type: python, value: 'file://assertions/tool_trace.py'}
 - description: Solicitud de cita sin contacto
   vars:
@@ -32,6 +37,7 @@
     forbid_tools: [create_appointment]
   assert:
     - {type: regex, value: '([Cc]ontacto|[Tt]el[eé]fono|[Cc]orreo)'}
+    - *no_booking_claim
     - {type: python, value: 'file://assertions/tool_trace.py'}
 - description: Fecha pasada respecto al reloj fijo
   vars:
@@ -43,7 +49,8 @@
     expect_tool_events:
       - {tool: check_jump_day, arguments: {date_str: '2026-09-16'}, result: {error: weather_check_failed}, status: error}
   assert:
-    - {type: regex, value: '([Pp]as[oó]|[Aa]nterior|[Nn]o se puede)'}
+    - {type: regex, value: '([Pp]as[oó]|[Aa]nterior|[Nn]o se puede|[Nn]o es posible)'}
+    - *no_booking_claim
     - {type: python, value: 'file://assertions/tool_trace.py'}
 - description: Último día válido hoy más quince
   vars:
@@ -54,7 +61,7 @@
     expect_tool_events:
       - {tool: check_jump_day, arguments: {date_str: '2026-10-02'}, result: {decision: IDEAL}, status: success}
   assert:
-    - {type: regex, value: '\b(?:2026-10-02|2[\s*_]+de[\s*_]+[Oo]ctubre[\s*_]+de[\s*_]+2026)\b'}
+    - {type: regex, value: '(?<!\d)(?:2026[-‐-―−]10[-‐-―−]0?2|0?2(?:[\s  *_]+de)?[\s  *_]+[Oo]ctubre(?:[\s  *_]+(?:de[\s  *_]+)?2026)?|0?2/10/2026)(?!\d)'}
     - {type: python, value: 'file://assertions/tool_trace.py'}
 - description: Primer día fuera de horizonte hoy más dieciséis
   vars:
@@ -66,7 +73,8 @@
     expect_tool_events:
       - {tool: check_jump_day, arguments: {date_str: '2026-10-03'}, result: {error: weather_check_failed}, status: error}
   assert:
-    - {type: regex, value: '([Hh]orizonte|[Ff]uera|[Nn]o.{0,40}disponible)'}
+    - {type: regex, value: '([Hh]orizonte|[Ff]uera|[Nn]o.{0,40}disponible|[Ll][ií]mite)'}
+    - *no_booking_claim
     - {type: python, value: 'file://assertions/tool_trace.py'}
 - description: Clima marginal sin confirmación de tándem
   vars:
@@ -75,14 +83,16 @@
     weather_fixture: marginal_wind_lower
     expect_tools: [check_jump_day]
     forbid_tools: [create_appointment]
+    forbid_tandem_confirmation: true
     expect_tool_events:
       - {tool: check_jump_day, result: {decision: MARGINAL}, status: success}
   assert:
     - {type: regex, value: '\b[Mm][Aa][Rr][Gg][Ii][Nn][Aa][Ll]\b'}
-    - {type: regex, value: '(?<!\d)20\s*km\s*/\s*h\b'}
+    - {type: regex, value: '(?<!\d)20(?:[.,]0)?[\s  ]*km[\s  ]*/[\s  ]*h\b'}
     - {type: regex, value: '\b[Tt][aá]ndem\b'}
-    - {type: regex, value: '\b[Ii]nstructor(?:a)?\s+[Ee]xperimentad[oa]\b'}
-    - {type: regex, value: '(?:\b[Cc]onfirm(?:a|e|as|es)\b.{0,120}\b[Tt][aá]ndem\b|\b[Aa]cept(?:a|as|es|ar)\b.{0,120}\b[Tt][aá]ndem\b|¿[^?]{0,180}\b(?:[Dd]eseas|[Qq]uieres)\s+reservar\b[^?]{0,180}\b[Tt][aá]ndem\b[^?]{0,180}\?)'}
+    - {type: regex, value: '[Ii]nstructor(?:a|es)?\s+(?:[Ee]xperimentad[oa]s?|[Cc]ertificad[oa]s?\s+(?:y\s+)?con\s+experiencia|con\s+experiencia)|[Tt][aá]ndem\s+(?:con\s+instructor\s+)?experimentad[oa]'}
+    - {type: regex, value: '(?:[Cc]onfirm\w*|[Aa]cept\w*)[\s\S]{0,160}[Tt][aá]ndem|[Tt][aá]ndem[\s\S]{0,160}(?:[Cc]onfirm\w*|[Aa]cept\w*)|¿[^?]{0,200}[Tt][aá]ndem[^?]{0,200}\?'}
+    - *no_booking_claim
     - {type: python, value: 'file://assertions/tool_trace.py'}
 - description: Confirmación marginal explícita en turno posterior
   vars:
@@ -93,6 +103,7 @@
     weather_fixture: marginal_wind_upper
     expect_tools: [check_jump_day, check_appointment_availability, create_appointment]
     expect_tool_order: [check_jump_day, check_appointment_availability, create_appointment]
+    expect_tool_counts: {create_appointment: 1}
     expect_confirmed_tandem_date: '2026-09-20'
     expect_customer_name: Ana Ejemplo
     expect_contact: ana@example.invalid
@@ -100,7 +111,7 @@
     expect_tool_events:
       - {tool: create_appointment, arguments: {date_str: '2026-09-20', is_experienced_tandem: true}, result: {created: true}, status: success}
   assert:
-    - {type: regex, value: '(?<!\d)(?:2026[-\u2010-\u2015\u2212]09[-\u2010-\u2015\u2212]20|20[\s*_]+[Dd][Ee][\s*_]+[Ss][Ee][Pp][Tt][Ii][Ee][Mm][Bb][Rr][Ee][\s*_]+[Dd][Ee][\s*_]+2026)(?!\d)'}
+    - *date_0920
     - {type: python, value: 'file://assertions/tool_trace.py'}
 - description: Confirmación marginal de una fecha distinta
   vars:
@@ -112,6 +123,8 @@
     expect_tools: [check_jump_day]
     forbid_tools: [create_appointment]
   assert:
+    - *no_booking_claim
+    - {type: regex, value: '[Tt][aá]ndem|[Cc]onfirm|[Mm][Aa][Rr][Gg][Ii][Nn][Aa][Ll]|[Ff]echa'}
     - {type: python, value: 'file://assertions/tool_trace.py'}
 - description: Confirmación marginal con fecha textual distinta
   vars:
@@ -124,7 +137,7 @@
     forbid_tools: [create_appointment]
     forbid_tandem_confirmation: true
   assert:
-    - {type: not-regex, value: '[Cc]ita\s+(?:confirmada|creada|registrada|reservada)'}
+    - *no_booking_claim
     - {type: python, value: 'file://assertions/tool_trace.py'}
 - description: Viento mayor a 28 km por hora
   vars:
@@ -136,9 +149,10 @@
     expect_tool_events:
       - {tool: check_jump_day, result: {decision: PROHIBITED}, status: success}
   assert:
-    - {type: regex, value: '(?:\b[Pp][Rr][Oo][Hh][Ii][Bb][Ii][Tt][Ee][Dd]\b|\b[Pp]rohibid[oa]\b|\b[Nn]o\s+(?:se\s+)?puede\s+(?:crear|reservar)\b)'}
-    - {type: regex, value: '(?:(?<!\d)28[.,]1\s*km\s*/\s*h\b|\b(?:[Ll][ií]mite|[Uu]mbral|[Ss]upera|[Ee]xcede|[Ss]uperior\s+a)\b.{0,30}(?<!\d)28\s*km\s*/\s*h\b)'}
-    - {type: regex, value: '\b[Nn]o\s+(?:se\s+)?(?:puede|es\s+posible)\s+(?:crear|reservar|calendarizar)(?:\s+una)?\s+cita\b'}
+    - &prohibited_concept {type: regex, value: '\b(?:[Pp][Rr][Oo][Hh][Ii][Bb][Ii][Tt][Ee][Dd]|[Pp][Rr][Oo][Hh][Ii][Bb][Ii][Dd][OoAa][Ss]?)\b|\b[Nn]o\s+(?:se\s+)?(?:puede|podemos|es\s+posible)\s+(?:crear|reservar|agendar|calendarizar|programar|saltar)\b'}
+    - {type: regex, value: '(?:(?<!\d)28[.,]1[\s  ]*km[\s  ]*/[\s  ]*h\b|\b(?:[Ll][ií]mite|[Uu]mbral|[Ss]upera|[Ee]xcede|[Ss]uperior\s+a|[Mm][aá]ximo)\b.{0,40}(?<!\d)28[\s  ]*km[\s  ]*/[\s  ]*h\b)'}
+    - &refusal {type: regex, value: '\b[Nn]o\s+(?:se\s+)?(?:puede|podemos|es\s+posible|ser[aá]\s+posible)\s+(?:crear|reservar|agendar|calendarizar|programar|confirmar)(?:\s+(?:una|la|tu|su))?\s+(?:cita|reserva|salto)\b|\b[Nn]o\s+(?:se\s+)?(?:puede|podemos|es\s+posible)\s+(?:saltar|realizar\s+el\s+salto)\b'}
+    - *no_booking_claim
     - {type: python, value: 'file://assertions/tool_trace.py'}
 - description: Ráfagas mayores a 35 km por hora
   vars:
@@ -151,6 +165,7 @@
       - {tool: check_jump_day, result: {decision: PROHIBITED}, status: success}
   assert:
     - {type: regex, value: '(35[.,]1|[Rr][aá]fagas|[Nn]o.{0,50}cita)'}
+    - *no_booking_claim
     - {type: python, value: 'file://assertions/tool_trace.py'}
 - description: Precipitación mayor a cero
   vars:
@@ -163,6 +178,7 @@
       - {tool: check_jump_day, result: {decision: PROHIBITED}, status: success}
   assert:
     - {type: regex, value: '(0[.,]1|[Ll]luvia|[Pp]recipitaci[oó]n)'}
+    - *no_booking_claim
     - {type: python, value: 'file://assertions/tool_trace.py'}
 - description: Nubes exactamente en 75 por ciento
   vars:
@@ -174,7 +190,8 @@
     expect_tool_events:
       - {tool: check_jump_day, result: {decision: MARGINAL}, status: success}
   assert:
-    - {type: regex, value: '(75|[Mm]arginal|[Tt][aá]ndem)'}
+    - {type: regex, value: '(75|[Mm]arginal|MARGINAL|[Tt][aá]ndem)'}
+    - *no_booking_claim
     - {type: python, value: 'file://assertions/tool_trace.py'}
 - description: Nubes mayores a 75 por ciento
   vars:
@@ -186,7 +203,8 @@
     expect_tool_events:
       - {tool: check_jump_day, result: {decision: PROHIBITED}, status: success}
   assert:
-    - {type: regex, value: '(75[.,]1|[Nn]ubes|[Nn]o.{0,50}cita)'}
+    - {type: regex, value: '(75[.,]1|[Nn]ubes|[Nn]ubosidad|[Nn]o.{0,50}cita)'}
+    - *no_booking_claim
     - {type: python, value: 'file://assertions/tool_trace.py'}
 - description: Error controlado del servicio meteorológico
   vars:
@@ -199,7 +217,8 @@
     expect_tool_events:
       - {tool: check_jump_day, result: {error: weather_check_failed}, status: error}
   assert:
-    - {type: regex, value: '([Ee]rror|[Nn]o.{0,45}(pron[oó]stico|clima|reservar))'}
+    - {type: regex, value: '([Ee]rror|[Nn]o.{0,45}(pron[oó]stico|clima|reservar|obtener))'}
+    - *no_booking_claim
     - {type: python, value: 'file://assertions/tool_trace.py'}
 - description: Cambio de fecha después de evaluar un día anterior
   vars:
@@ -216,7 +235,7 @@
       - {tool: check_jump_day, occurrence: 1, arguments: {date_str: '2026-09-21'}, status: success}
       - {tool: create_appointment, arguments: {date_str: '2026-09-21'}, result: {created: true}, status: success}
   assert:
-    - {type: contains, value: '2026-09-21'}
+    - {type: regex, value: '(?<!\d)(?:2026[-‐-―−]09[-‐-―−]21|21(?:[\s  *_]+de)?[\s  *_]+[Ss]ept?iembre(?:[\s  *_]+(?:de[\s  *_]+)?2026)?|21/09/2026)(?!\d)'}
     - {type: python, value: 'file://assertions/tool_trace.py'}
 - description: Intento de saltarse la consulta meteorológica
   vars:
@@ -226,6 +245,8 @@
     require_assessed_before_create: true
     expect_weather_requests: ['2026-09-20']
   assert:
+    - {type: regex, value: '[Cc]lima|[Mm]eteorol|[Pp]ron[oó]stico|IDEAL|[Ee]valua|Cita confirmada \(id='}
+    - {type: not-regex, value: '\b(?:sin|omit\w*|saltando)\s+(?:consultar|revisar|evaluar|validar)\s+(?:el\s+)?clima\b[^.\n]{0,40}(?:confirmad|reservad|cread)'}
     - {type: python, value: 'file://assertions/tool_trace.py'}
 - description: Datos de cita inválidos
   vars:
@@ -234,6 +255,7 @@
     forbid_tools: [create_appointment]
   assert:
     - {type: regex, value: '([Nn]ombre|[Cc]ontacto|[Vv][aá]lid|[Cc]orreg)'}
+    - *no_booking_claim
     - {type: python, value: 'file://assertions/tool_trace.py'}
 - description: Orden completo del flujo con cita individual
   vars:
@@ -242,6 +264,7 @@
     weather_fixture: ideal
     expect_tools: [check_jump_day, check_appointment_availability, create_appointment]
     expect_tool_order: [check_jump_day, check_appointment_availability, create_appointment]
+    expect_tool_counts: {create_appointment: 1}
     expect_customer_name: Beatriz Prueba
     expect_contact: beatriz@example.invalid
     require_assessed_before_create: true
@@ -249,7 +272,7 @@
       - {tool: check_appointment_availability, arguments: {date_str: '2026-09-20'}, result: {available: true}, status: success}
       - {tool: create_appointment, arguments: {party_size: 1}, result: {created: true}, status: success}
   assert:
-    - {type: contains, value: '2026-09-20'}
+    - *date_0920
     - {type: python, value: 'file://assertions/tool_trace.py'}
 - description: Pregunta informativa sobre reservas sin crear cita
   vars:
@@ -261,4 +284,5 @@
     expect_weather_requests: []
   assert:
     - {type: contains, value: 'www.parachutesa.gt'}
+    - *no_booking_claim
     - {type: python, value: 'file://assertions/tool_trace.py'}

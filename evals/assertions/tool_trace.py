@@ -16,6 +16,8 @@ def get_assert(output: str, context: dict):
     variables = context.get("vars", {})
     names = [event.get("tool") for event in events]
     counts = Counter(names)
+    successes = [event for event in events if event.get("status") == "success"]
+    success_counts = Counter(event.get("tool") for event in successes)
 
     for tool in variables.get("expect_tools", []):
         if counts[tool] == 0:
@@ -23,14 +25,40 @@ def get_assert(output: str, context: dict):
     for tool in variables.get("forbid_tools", []):
         if counts[tool] != 0:
             return _result(False, f"Herramienta prohibida ejecutada: {tool}")
+    created = [event for event in events if event.get("tool") == "create_appointment"
+               and (event.get("result") or {}).get("created") is True]
     if "expect_tool_counts" in variables:
         for tool, expected in variables["expect_tool_counts"].items():
-            if counts[tool] != expected:
-                return _result(False, f"{tool}: {counts[tool]} ejecuciones; se esperaban {expected}")
+            # Creation is counted strictly by real new records; other tools by successful calls.
+            observed = len(created) if tool == "create_appointment" else success_counts[tool]
+            if observed != expected:
+                return _result(False, f"{tool}: {observed} ejecuciones exitosas; se esperaban {expected}")
     if "expect_tool_order" in variables:
         expected = variables["expect_tool_order"]
-        if names != expected:
-            return _result(False, f"Orden observado {names}; esperado {expected}")
+        relevant = [event.get("tool") for event in successes if event.get("tool") in set(expected)]
+        position = 0
+        for tool in relevant:
+            if position < len(expected) and tool == expected[position]:
+                position += 1
+        if position != len(expected):
+            return _result(False, f"Orden exitoso observado {relevant}; se esperaba la subsecuencia {expected}")
+    # Always enforced: every new appointment follows a successful weather check and a later
+    # successful availability check for the same date.
+    last_weather = last_availability = None
+    for event in events:
+        tool, ok = event.get("tool"), event.get("status") == "success"
+        arguments = event.get("arguments") or {}
+        if tool == "check_jump_day":
+            last_weather = arguments.get("date_str") if ok else None
+            last_availability = None
+        elif tool == "check_appointment_availability":
+            available = ok and (event.get("result") or {}).get("available") is True
+            last_availability = arguments.get("date_str") if available else None
+        elif tool == "create_appointment" and (event.get("result") or {}).get("created") is True:
+            day = arguments.get("date_str")
+            if day is None or day != last_weather or day != last_availability:
+                return _result(False, "create_appointment exitoso fuera del orden clima -> disponibilidad")
+            last_availability = None  # an approval is consumed by one creation
     if "min_retrieved_context" in variables:
         retrieved = metadata.get("retrieved_context")
         if not isinstance(retrieved, list) or len(retrieved) < variables["min_retrieved_context"]:
