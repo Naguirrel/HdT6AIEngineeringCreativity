@@ -9,11 +9,19 @@ from src.observability import log_event
 @records_output
 def answer_from_faq(context: ParachuteContext, query: str) -> str:
     log_event(architecture=context.architecture, tool="search_faq")
-    entries = context.services.faq_service.search_faq(query)
+    faq = context.services.faq_service
+    entries = faq.search_faq(query)
+    # The model may rephrase (or translate) the question into words the corpus does not use;
+    # the user's own message of this turn is a deterministic fallback.
+    user_message = context.last_user_message
+    fallback = not entries and bool(user_message.strip()) and user_message.strip() != query.strip()
+    if fallback:
+        entries = faq.search_faq(user_message)
     context.record_faq_entries([{"question": entry.question, "answer": entry.answer} for entry in entries])
     context.record_tool_event(
         "search_faq",
-        {"query_hmac": context.pseudonymize(query), "query_length": len(query)},
+        {"query_hmac": context.pseudonymize(query), "query_length": len(query),
+         "fallback_to_user_message": fallback},
         {"match_count": len(entries)},
         "success",
     )

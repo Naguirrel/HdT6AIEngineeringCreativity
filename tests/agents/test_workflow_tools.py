@@ -422,3 +422,28 @@ def test_booking_tool_reports_invalid_input_without_using_capacity(build_context
     assert "nombre" in result
     assert context.appointment_record is None
     assert context.services.calendar_service.check_availability(TOMORROW)
+
+
+@pytest.mark.parametrize("model_query", ["pregnancy", "pregnant skydiving restrictions"])
+def test_faq_search_falls_back_to_the_users_words_when_the_model_rephrases(build_context, model_query):
+    # Regression from eval-Ufz: the specialist searched with a 9-character rephrasing and got 0 results.
+    context = build_context({})
+    context.observe_user_message("Estoy embarazada, ¿puedo saltar?")
+    answer = answer_from_faq(context, model_query)
+    assert "embarazo" in answer
+    event = context.get_tool_trace()[-1]
+    assert event["arguments"]["fallback_to_user_message"] is True
+    assert event["result"] == {"match_count": 1}
+
+
+def test_faq_search_does_not_fall_back_when_the_query_already_matches(build_context):
+    context = build_context({})
+    context.observe_user_message("¿Cuál es el límite de peso?")
+    answer_from_faq(context, "peso máximo")
+    assert context.get_tool_trace()[-1]["arguments"]["fallback_to_user_message"] is False
+
+
+def test_irrelevant_question_still_abstains_after_fallback(build_context):
+    context = build_context({})
+    context.observe_user_message("¿Quién ganó el mundial de ajedrez de 1972?")
+    assert "No se encontro" in answer_from_faq(context, "chess world champion 1972")
